@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Lifecycle"
+  short_description: "Worktreeとマージ後処理を定型化"
+  default_prompt: "Use $task-lifecycle to start or close out a repository task."
