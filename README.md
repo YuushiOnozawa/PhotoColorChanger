@@ -9,6 +9,7 @@
 - TypeScript
 - React
 - Vite
+- Tailwind CSS
 
 ### セットアップ
 
