@@ -2,6 +2,7 @@ node_modules/
 dist/
 .vite/
 *.local
+.agents/skills/
 
 # TypeScript incremental build information
 *.tsbuildinfo

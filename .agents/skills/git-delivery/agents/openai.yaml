@@ -1,4 +1,0 @@
-interface:
-  display_name: "Git Delivery"
-  short_description: "安全な日本語Conventional Commitを作成"
-  default_prompt: "Use $git-delivery to review and create a safe Japanese Conventional Commit."
