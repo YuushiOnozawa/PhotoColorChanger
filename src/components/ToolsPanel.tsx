@@ -7,8 +7,10 @@ interface ToolsPanelProps {
   isLoading: boolean;
   onFileSelect: (file: File | undefined) => void;
   onReplacementColorChange: (color: string) => void;
+  onToleranceChange: (tolerance: number) => void;
   replacementColor: string;
   selectedColor: string | null;
+  tolerance: number;
 }
 
 function ToolsPanel({
@@ -17,8 +19,10 @@ function ToolsPanel({
   isLoading,
   onFileSelect,
   onReplacementColorChange,
+  onToleranceChange,
   replacementColor,
   selectedColor,
+  tolerance,
 }: ToolsPanelProps) {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -64,7 +68,7 @@ function ToolsPanel({
             <div className="flex items-center justify-between gap-3">
               <dt>{imageUiText.colorPicker.targetLabel}</dt>
               <dd className="m-0 font-mono font-bold">
-                <output aria-label="選択中の置換対象色">
+                <output aria-label={imageUiText.colorPicker.selectedOutputLabel}>
                   {selectedColor ?? imageUiText.colorPicker.unselected}
                 </output>
               </dd>
@@ -83,11 +87,42 @@ function ToolsPanel({
                   onChange={(event) => onReplacementColorChange(event.currentTarget.value)}
                   aria-label={imageUiText.colorPicker.replacementLabel}
                 />
-                <output aria-label="置換後の色コード" className="font-mono font-bold">
+                <output
+                  aria-label={imageUiText.colorPicker.replacementOutputLabel}
+                  className="font-mono font-bold"
+                >
                   {replacementColor}
                 </output>
               </dd>
             </div>
+            {selectedColor && (
+              <div className="flex items-center justify-between gap-3">
+                <dt>
+                  <label htmlFor="color-tolerance">
+                    {imageUiText.colorReplacement.toleranceLabel}
+                  </label>
+                </dt>
+                <dd className="m-0 flex items-center gap-2">
+                  <input
+                    id="color-tolerance"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={tolerance}
+                    onChange={(event) => onToleranceChange(Number(event.currentTarget.value))}
+                    aria-label={imageUiText.colorReplacement.toleranceLabel}
+                  />
+                  <output
+                    aria-label={`${imageUiText.colorReplacement.toleranceLabel}の値`}
+                    className="font-mono font-bold"
+                  >
+                    {tolerance}
+                    {imageUiText.colorReplacement.toleranceUnit}
+                  </output>
+                </dd>
+              </div>
+            )}
           </dl>
         </section>
       )}

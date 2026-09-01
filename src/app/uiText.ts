@@ -12,8 +12,14 @@ export const imageUiText = {
     title: "色を選択",
     hint: "Canvas上の色をクリックすると、置換対象色として選択できます。",
     targetLabel: "置換対象色",
+    selectedOutputLabel: "選択中の置換対象色",
     replacementLabel: "置換後の色",
+    replacementOutputLabel: "置換後の色コード",
     unselected: "未選択",
+  },
+  colorReplacement: {
+    toleranceLabel: "許容範囲",
+    toleranceUnit: "%",
   },
   errors: {
     unsupported:

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
 import { imageUiText } from "./app/uiText";
@@ -17,18 +17,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [replacementColor, setReplacementColor] = useState("#ffffff");
+  const [tolerance, setTolerance] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !loadedImage) return;
-
-    canvas.width = loadedImage.width;
-    canvas.height = loadedImage.height;
-    canvas
-      .getContext("2d")
-      ?.drawImage(loadedImage.source, 0, 0, loadedImage.width, loadedImage.height);
-  }, [loadedImage]);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -41,6 +31,7 @@ function App() {
       const nextImage = await loadImageFile(file);
       setLoadedImage(nextImage);
       setSelectedColor(null);
+      setTolerance(0);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
         setNotice(imageUiText.notices.resized);
@@ -90,8 +81,10 @@ function App() {
           isLoading={isLoading}
           onFileSelect={(file) => void handleFile(file)}
           onReplacementColorChange={setReplacementColor}
+          onToleranceChange={setTolerance}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
+          tolerance={tolerance}
         />
         <CanvasPanel
           canvasRef={canvasRef}
@@ -101,6 +94,9 @@ function App() {
           notice={notice}
           onCanvasClick={handleCanvasClick}
           onFileSelect={(file) => void handleFile(file)}
+          replacementColor={replacementColor}
+          selectedColor={selectedColor}
+          tolerance={tolerance}
         />
         <HistoryPanel />
       </div>

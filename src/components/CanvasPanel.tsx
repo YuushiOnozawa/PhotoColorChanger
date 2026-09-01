@@ -1,4 +1,6 @@
-import type { MouseEvent, RefObject } from "react";
+import { useEffect, type MouseEvent, type RefObject } from "react";
+import { hexToRgb } from "../app/color";
+import { replaceSimilarColors } from "../app/colorReplacement";
 import type { LoadedImage } from "../app/imageLoader";
 import { imageUiText } from "../app/uiText";
 
@@ -10,6 +12,9 @@ interface CanvasPanelProps {
   notice: string | null;
   onCanvasClick: (event: MouseEvent<HTMLCanvasElement>) => void;
   onFileSelect: (file: File | undefined) => void;
+  replacementColor: string;
+  selectedColor: string | null;
+  tolerance: number;
 }
 
 function CanvasPanel({
@@ -20,7 +25,30 @@ function CanvasPanel({
   notice,
   onCanvasClick,
   onFileSelect,
+  replacementColor,
+  selectedColor,
+  tolerance,
 }: CanvasPanelProps) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !loadedImage) return;
+
+    canvas.width = loadedImage.width;
+    canvas.height = loadedImage.height;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    context.drawImage(loadedImage.source, 0, 0, loadedImage.width, loadedImage.height);
+
+    const target = selectedColor ? hexToRgb(selectedColor) : null;
+    const replacement = hexToRgb(replacementColor);
+    if (!target || !replacement) return;
+
+    const imageData = context.getImageData(0, 0, loadedImage.width, loadedImage.height);
+    imageData.data.set(replaceSimilarColors(imageData.data, target, replacement, tolerance));
+    context.putImageData(imageData, 0, 0);
+  }, [canvasRef, loadedImage, replacementColor, selectedColor, tolerance]);
+
   return (
     <section
       className="flex min-h-[420px] flex-col rounded-2xl border border-[#ded7ca] bg-[#fffdf8] p-5 shadow-[0_1rem_2.5rem_rgb(75_59_42_/_7%)] max-[640px]:min-h-0"
