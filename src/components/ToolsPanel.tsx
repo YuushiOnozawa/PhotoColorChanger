@@ -102,7 +102,7 @@ function ToolsPanel({
                     step="1"
                     value={lineThreshold}
                     onChange={(event) => onLineThresholdChange(Number(event.currentTarget.value))}
-                    aria-label={imageUiText.preview.lineArtLabel}
+                    aria-label={imageUiText.preview.thresholdLabel}
                   />
                   <output
                     aria-label={`${imageUiText.preview.thresholdLabel}の値`}

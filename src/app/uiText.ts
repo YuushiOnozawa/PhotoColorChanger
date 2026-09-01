@@ -12,7 +12,6 @@ export const imageUiText = {
     title: "プレビュー表示",
     replacement: "色置換",
     lineArt: "線画",
-    lineArtLabel: "線画プレビュー",
     thresholdLabel: "線画のしきい値",
     thresholdUnit: "%",
   },
