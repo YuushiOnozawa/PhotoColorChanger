@@ -1,8 +1,53 @@
+import { useEffect, useRef, useState } from "react";
+import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
 import "./styles.css";
 
 function App() {
-  const isImageLoaded = initialAppState.imageSessionStatus !== "empty";
+  const [appState, setAppState] = useState(initialAppState);
+  const [loadedImage, setLoadedImage] = useState<LoadedImage | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !loadedImage) return;
+
+    canvas.width = loadedImage.width;
+    canvas.height = loadedImage.height;
+    canvas
+      .getContext("2d")
+      ?.drawImage(loadedImage.source, 0, 0, loadedImage.width, loadedImage.height);
+  }, [loadedImage]);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+
+    setErrorMessage(null);
+    setNotice(null);
+    setIsLoading(true);
+
+    try {
+      const nextImage = await loadImageFile(file);
+      setLoadedImage(nextImage);
+      setAppState({ imageSessionStatus: "loaded" });
+      if (nextImage.wasResized) {
+        setNotice("画像が大きいため、長辺4096px以下に縮小しました。");
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof ImageLoadError && error.kind === "unsupported"
+          ? "対応形式はJPEG、PNG、WebPです。ファイル形式を確認して、もう一度選択してください。"
+          : "画像を読み込めませんでした。破損していないJPEG、PNG、WebPを選び直してください。",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isImageLoaded = appState.imageSessionStatus === "loaded";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-[1440px] p-[clamp(1.25rem,3vw,3rem)] max-[640px]:p-4">
@@ -29,9 +74,33 @@ function App() {
           <h2 id="tools-title" className="mb-3 text-base">
             ツール
           </h2>
-          <p className="mb-0 text-[0.9rem] leading-[1.7] text-[#6e675e]">
-            画像を読み込むと、ここに編集ツールが表示されます。
+          <label
+            htmlFor="image-file"
+            className="inline-flex cursor-pointer rounded-lg bg-[#9a5634] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#814426] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#9a5634]"
+          >
+            画像を選択
+          </label>
+          <input
+            id="image-file"
+            className="sr-only"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-label="画像ファイル"
+            disabled={isLoading}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              void handleFile(file);
+            }}
+          />
+          <p className="mt-3 mb-0 text-[0.9rem] leading-[1.7] text-[#6e675e]">
+            JPEG、PNG、WebPを選択するか、Canvasへドロップしてください。
           </p>
+          {errorMessage && (
+            <p className="mt-4 mb-0 text-[0.9rem] leading-[1.7] text-[#b3261e]" role="alert">
+              {errorMessage}
+            </p>
+          )}
         </aside>
 
         <section
@@ -46,16 +115,42 @@ function App() {
               className="rounded-full bg-[#f4e2d5] px-2.5 py-1.5 text-xs font-bold whitespace-nowrap text-[#8a4a2c]"
               aria-live="polite"
             >
-              {isImageLoaded ? "読み込み済み" : "画像未読み込み"}
+              {isLoading ? "読み込み中" : isImageLoaded ? "読み込み済み" : "画像未読み込み"}
             </span>
           </div>
           <div
-            className="grid min-h-[320px] flex-1 place-items-center rounded-xl border border-dashed border-[#cdbfad] bg-[repeating-conic-gradient(#faf6ee_0%_25%,#f3ede3_0%_50%)] text-center text-[#84796d] [background-size:1.5rem_1.5rem] max-[640px]:min-h-[260px]"
-            role="img"
-            aria-label="画像未読み込みのCanvas"
+            className="grid min-h-[320px] flex-1 place-items-center overflow-auto rounded-xl border border-dashed border-[#cdbfad] bg-[repeating-conic-gradient(#faf6ee_0%_25%,#f3ede3_0%_50%)] text-center text-[#84796d] [background-size:1.5rem_1.5rem] max-[640px]:min-h-[260px]"
+            role="region"
+            aria-label="画像をドロップするCanvas領域"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              void handleFile(event.dataTransfer.files[0]);
+            }}
           >
-            <span>画像を読み込むと、ここに表示されます</span>
+            {loadedImage ? (
+              <canvas
+                ref={canvasRef}
+                className="max-h-full max-w-full object-contain"
+                role="img"
+                aria-label={`${loadedImage.name}の画像`}
+              />
+            ) : (
+              <span>
+                {isLoading ? "画像を読み込んでいます" : "画像を読み込むと、ここに表示されます"}
+              </span>
+            )}
           </div>
+          {loadedImage && (
+            <p className="mt-3 mb-0 text-[0.9rem] text-[#6e675e]" role="status">
+              {loadedImage.name}（{loadedImage.width} × {loadedImage.height}px）
+            </p>
+          )}
+          {notice && (
+            <p className="mt-3 mb-0 text-[0.9rem] text-[#6e675e]" role="status" aria-live="polite">
+              {notice}
+            </p>
+          )}
         </section>
 
         <aside

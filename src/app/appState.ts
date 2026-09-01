@@ -1,4 +1,4 @@
-export type ImageSessionStatus = "empty";
+export type ImageSessionStatus = "empty" | "loaded";
 
 export interface AppState {
   imageSessionStatus: ImageSessionStatus;
