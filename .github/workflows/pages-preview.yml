@@ -1,0 +1,96 @@
+name: Deploy PR Preview to GitHub Pages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "プレビュー対象のPR番号"
+        required: true
+        type: number
+      pr_ref:
+        description: "プレビュー対象のブランチ名またはコミットSHA"
+        required: true
+        type: string
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  PREVIEW_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+  PREVIEW_REF: ${{ github.event.pull_request.head.sha || inputs.pr_ref }}
+  PREVIEW_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: mainを取得
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: PRブランチを取得
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PREVIEW_REPOSITORY }}
+          ref: ${{ env.PREVIEW_REF }}
+          path: pr
+
+      - name: Node.jsをセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: main/.nvmrc
+          cache: npm
+          cache-dependency-path: main/package-lock.json
+
+      - name: mainの依存関係をインストール
+        working-directory: main
+        run: npm ci
+
+      - name: mainをビルド
+        working-directory: main
+        run: npm run build -- --base "/${{ github.event.repository.name }}/"
+
+      - name: PR版の依存関係をインストール
+        working-directory: pr
+        run: npm ci
+
+      - name: PR版をビルド
+        working-directory: pr
+        run: npm run build -- --base "/${{ github.event.repository.name }}/previews/pr-${{ env.PREVIEW_NUMBER }}/"
+
+      - name: 公開用ファイルを組み立てる
+        run: |
+          mkdir -p "site/previews/pr-${PREVIEW_NUMBER}"
+          cp -R main/dist/. site/
+          cp -R pr/dist/. "site/previews/pr-${PREVIEW_NUMBER}/"
+
+      - name: Pages用アーティファクトを作成
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages-preview-${{ env.PREVIEW_NUMBER }}
+          path: ./site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}previews/pr-${{ env.PREVIEW_NUMBER }}/
+    steps:
+      - name: GitHub Pagesへデプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-preview-${{ env.PREVIEW_NUMBER }}
