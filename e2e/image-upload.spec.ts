@@ -73,3 +73,33 @@ test("C04の対象色取得と置換後の色選択を検証する", async ({ pa
   });
   await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
 });
+
+test("C05の近似色置換プレビューと許容範囲を検証する", async ({ page }) => {
+  await page.goto("/");
+  const fileInput = page.getByLabel("画像ファイル");
+
+  await fileInput.setInputFiles(await createPngFile(page, "replacement.png", 4, 2));
+
+  const canvas = page.getByRole("img", { name: "replacement.pngの画像" });
+  await canvas.click({ position: { x: 1, y: 1 } });
+  await page.locator("#replacement-color").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "#336699");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  await expect
+    .poll(() =>
+      canvas.evaluate((element) => {
+        const context = (element as HTMLCanvasElement).getContext("2d");
+        return context ? Array.from(context.getImageData(1, 1, 1, 1).data) : [];
+      }),
+    )
+    .toEqual([51, 102, 153, 255]);
+
+  const tolerance = page.locator("#color-tolerance");
+  await tolerance.fill("25");
+  await expect(page.getByLabel("許容範囲の値")).toHaveText("25%");
+});
