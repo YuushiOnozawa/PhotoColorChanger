@@ -8,6 +8,13 @@ export const imageUiText = {
   canvas: {
     empty: "画像を読み込むと、ここに表示されます",
   },
+  preview: {
+    title: "プレビュー表示",
+    replacement: "色置換",
+    lineArt: "線画",
+    thresholdLabel: "線画のしきい値",
+    thresholdUnit: "%",
+  },
   colorPicker: {
     title: "色を選択",
     hint: "Canvas上の色をクリックすると、置換対象色として選択できます。",

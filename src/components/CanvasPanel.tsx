@@ -5,6 +5,7 @@ import {
   createPreviewRenderer,
   getPreviewMaxEdge,
   replacementColorFromHex,
+  type PreviewMode,
   type PreviewRenderer,
 } from "../app/previewRenderer";
 import { imageUiText } from "../app/uiText";
@@ -17,9 +18,11 @@ interface CanvasPanelProps {
   notice: string | null;
   onColorPick: (color: string) => void;
   onFileSelect: (file: File | undefined) => void;
+  previewMode: PreviewMode;
   replacementColor: string;
   selectedColor: string | null;
   tolerance: number;
+  lineThreshold: number;
 }
 
 function CanvasPanel({
@@ -30,9 +33,11 @@ function CanvasPanel({
   notice,
   onColorPick,
   onFileSelect,
+  previewMode,
   replacementColor,
   selectedColor,
   tolerance,
+  lineThreshold,
 }: CanvasPanelProps) {
   const rendererRef = useRef<PreviewRenderer | null>(null);
 
@@ -61,8 +66,10 @@ function CanvasPanel({
       targetColor: selectedColor ? hexToRgb(selectedColor) : null,
       replacementColor: replacementColorFromHex(replacementColor),
       tolerance,
+      mode: previewMode,
+      lineThreshold,
     });
-  }, [loadedImage, replacementColor, selectedColor, tolerance]);
+  }, [loadedImage, lineThreshold, previewMode, replacementColor, selectedColor, tolerance]);
 
   const handleCanvasClick = (event: MouseEvent<HTMLCanvasElement>) => {
     const canvas = event.currentTarget;

@@ -1,9 +1,11 @@
 import { hexToRgb } from "./color";
 import { replaceSimilarColors } from "./colorReplacement";
 import { fitImageDimensions } from "./imageLoader";
+import { createLineArtPixels } from "./lineArt";
 
 export type RgbColor = readonly [number, number, number];
 export type PreviewRendererKind = "webgl2" | "webgl" | "2d";
+export type PreviewMode = "replacement" | "lineArt";
 
 export interface PreviewRenderOptions {
   source: CanvasImageSource;
@@ -12,6 +14,8 @@ export interface PreviewRenderOptions {
   targetColor: RgbColor | null;
   replacementColor: RgbColor;
   tolerance: number;
+  mode: PreviewMode;
+  lineThreshold: number;
 }
 
 export interface PreviewRenderer {
@@ -43,10 +47,36 @@ uniform vec3 u_target;
 uniform vec3 u_replacement;
 uniform float u_tolerance;
 uniform bool u_hasTarget;
+uniform vec2 u_texelSize;
+uniform float u_lineThreshold;
+uniform bool u_showLineArt;
 varying vec2 v_texcoord;
+
+float luminance(vec3 color) {
+  return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+float edgeStrength(vec2 uv) {
+  float topLeft = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, -1.0)).rgb);
+  float top = luminance(texture2D(u_image, uv + u_texelSize * vec2(0.0, -1.0)).rgb);
+  float topRight = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, -1.0)).rgb);
+  float left = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, 0.0)).rgb);
+  float right = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, 0.0)).rgb);
+  float bottomLeft = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, 1.0)).rgb);
+  float bottom = luminance(texture2D(u_image, uv + u_texelSize * vec2(0.0, 1.0)).rgb);
+  float bottomRight = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, 1.0)).rgb);
+  float horizontal = -topLeft + topRight - 2.0 * left + 2.0 * right - bottomLeft + bottomRight;
+  float vertical = topLeft + 2.0 * top + topRight - bottomLeft - 2.0 * bottom - bottomRight;
+  return min(1.0, length(vec2(horizontal, vertical)) / 4.0);
+}
 
 void main() {
   vec4 source = texture2D(u_image, v_texcoord);
+  if (u_showLineArt) {
+    float line = step(max(0.01, u_lineThreshold), edgeStrength(v_texcoord));
+    gl_FragColor = vec4(vec3(1.0 - line), source.a);
+    return;
+  }
   float colorDistance = distance(source.rgb, u_target);
   gl_FragColor = u_hasTarget && colorDistance <= u_tolerance
     ? vec4(u_replacement, source.a)
@@ -121,6 +151,9 @@ function createWebGLRenderer(
   const replacementLocation = gl.getUniformLocation(program, "u_replacement");
   const toleranceLocation = gl.getUniformLocation(program, "u_tolerance");
   const hasTargetLocation = gl.getUniformLocation(program, "u_hasTarget");
+  const texelSizeLocation = gl.getUniformLocation(program, "u_texelSize");
+  const lineThresholdLocation = gl.getUniformLocation(program, "u_lineThreshold");
+  const showLineArtLocation = gl.getUniformLocation(program, "u_showLineArt");
   const buffer = gl.createBuffer();
   const texture = gl.createTexture();
   if (
@@ -131,6 +164,9 @@ function createWebGLRenderer(
     !replacementLocation ||
     !toleranceLocation ||
     !hasTargetLocation ||
+    !texelSizeLocation ||
+    !lineThresholdLocation ||
+    !showLineArtLocation ||
     !buffer ||
     !texture
   ) {
@@ -215,6 +251,9 @@ function createWebGLRenderer(
         (Math.max(0, Math.min(100, options.tolerance)) / 100) * Math.sqrt(3) + Math.sqrt(3) / 255,
       );
       gl.uniform1i(hasTargetLocation, options.targetColor ? 1 : 0);
+      gl.uniform2f(texelSizeLocation, 1 / dimensions.width, 1 / dimensions.height);
+      gl.uniform1f(lineThresholdLocation, Math.max(0, Math.min(100, options.lineThreshold)) / 100);
+      gl.uniform1i(showLineArtLocation, options.mode === "lineArt" ? 1 : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     },
     pick(x, y) {
@@ -266,6 +305,25 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
         canvas.height = dimensions.height;
       }
       context.clearRect(0, 0, dimensions.width, dimensions.height);
+      if (options.mode === "lineArt") {
+        const sourceImage = sourceData.context.getImageData(
+          0,
+          0,
+          dimensions.width,
+          dimensions.height,
+        );
+        const lineArt = context.createImageData(dimensions.width, dimensions.height);
+        lineArt.data.set(
+          createLineArtPixels(
+            sourceImage.data,
+            dimensions.width,
+            dimensions.height,
+            options.lineThreshold,
+          ),
+        );
+        context.putImageData(lineArt, 0, 0);
+        return;
+      }
       context.drawImage(sourceData.canvas, 0, 0);
       if (!options.targetColor) return;
 

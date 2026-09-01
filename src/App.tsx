@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
+import type { PreviewMode } from "./app/previewRenderer";
 import { imageUiText } from "./app/uiText";
 import AppHeader from "./components/AppHeader";
 import CanvasPanel from "./components/CanvasPanel";
@@ -17,6 +18,8 @@ function App() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [replacementColor, setReplacementColor] = useState("#ffffff");
   const [tolerance, setTolerance] = useState(0);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
+  const [lineThreshold, setLineThreshold] = useState(20);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleFile = async (file: File | undefined) => {
@@ -31,6 +34,8 @@ function App() {
       setLoadedImage(nextImage);
       setSelectedColor(null);
       setTolerance(0);
+      setPreviewMode("replacement");
+      setLineThreshold(20);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
         setNotice(imageUiText.notices.resized);
@@ -65,6 +70,10 @@ function App() {
           onFileSelect={(file) => void handleFile(file)}
           onReplacementColorChange={setReplacementColor}
           onToleranceChange={setTolerance}
+          onPreviewModeChange={setPreviewMode}
+          onLineThresholdChange={setLineThreshold}
+          previewMode={previewMode}
+          lineThreshold={lineThreshold}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
           tolerance={tolerance}
@@ -77,9 +86,11 @@ function App() {
           notice={notice}
           onColorPick={handleColorPick}
           onFileSelect={(file) => void handleFile(file)}
+          previewMode={previewMode}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
           tolerance={tolerance}
+          lineThreshold={lineThreshold}
         />
         <HistoryPanel />
       </div>
