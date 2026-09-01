@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
+import { imageUiText } from "./app/uiText";
 import "./styles.css";
 
 function App() {
@@ -34,13 +35,13 @@ function App() {
       setLoadedImage(nextImage);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
-        setNotice("画像が大きいため、長辺4096px以下に縮小しました。");
+        setNotice(imageUiText.notices.resized);
       }
     } catch (error) {
       setErrorMessage(
         error instanceof ImageLoadError && error.kind === "unsupported"
-          ? "対応形式はJPEG、PNG、WebPです。ファイル形式を確認して、もう一度選択してください。"
-          : "画像を読み込めませんでした。破損していないJPEG、PNG、WebPを選び直してください。",
+          ? imageUiText.errors.unsupported
+          : imageUiText.errors.invalid,
       );
     } finally {
       setIsLoading(false);
@@ -115,7 +116,11 @@ function App() {
               className="rounded-full bg-[#f4e2d5] px-2.5 py-1.5 text-xs font-bold whitespace-nowrap text-[#8a4a2c]"
               aria-live="polite"
             >
-              {isLoading ? "読み込み中" : isImageLoaded ? "読み込み済み" : "画像未読み込み"}
+              {isLoading
+                ? imageUiText.status.loading
+                : isImageLoaded
+                  ? imageUiText.status.loaded
+                  : imageUiText.status.empty}
             </span>
           </div>
           <div
@@ -137,7 +142,9 @@ function App() {
               />
             ) : (
               <span>
-                {isLoading ? "画像を読み込んでいます" : "画像を読み込むと、ここに表示されます"}
+                {isLoading
+                  ? imageUiText.status.loadingCanvas
+                  : "画像を読み込むと、ここに表示されます"}
               </span>
             )}
           </div>
