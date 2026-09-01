@@ -5,6 +5,9 @@ export const imageUiText = {
     loaded: "読み込み済み",
     loadingCanvas: "画像を読み込んでいます",
   },
+  canvas: {
+    empty: "画像を読み込むと、ここに表示されます",
+  },
   errors: {
     unsupported:
       "対応形式はJPEG、PNG、WebPです。ファイル形式を確認して、もう一度選択してください。",

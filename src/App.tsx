@@ -141,11 +141,7 @@ function App() {
                 aria-label={`${loadedImage.name}の画像`}
               />
             ) : (
-              <span>
-                {isLoading
-                  ? imageUiText.status.loadingCanvas
-                  : "画像を読み込むと、ここに表示されます"}
-              </span>
+              <span>{isLoading ? imageUiText.status.loadingCanvas : imageUiText.canvas.empty}</span>
             )}
           </div>
           {loadedImage && (
