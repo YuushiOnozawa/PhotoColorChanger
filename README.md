@@ -32,6 +32,24 @@ npm run test:run
 npm run build
 ```
 
+### E2Eテスト
+
+初回のみChromiumをインストールします。
+
+```bash
+npx playwright install chromium
+```
+
+Linuxで共有ライブラリ不足のエラーが出る場合は、OS依存関係も追加します。
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+```bash
+npm run test:e2e
+```
+
 ## GitHub Pages公開
 
 `main` ブランチへの変更をGitHub Actionsが検知し、静的ビルドをGitHub Pagesへデプロイします。
