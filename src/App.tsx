@@ -1,8 +1,7 @@
-import { useRef, useState, type MouseEvent } from "react";
+import { useRef, useState } from "react";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
 import { imageUiText } from "./app/uiText";
-import { rgbToHex } from "./app/color";
 import AppHeader from "./components/AppHeader";
 import CanvasPanel from "./components/CanvasPanel";
 import HistoryPanel from "./components/HistoryPanel";
@@ -47,23 +46,7 @@ function App() {
     }
   };
 
-  const handleCanvasClick = (event: MouseEvent<HTMLCanvasElement>) => {
-    const canvas = event.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const context = canvas.getContext("2d");
-    if (!context || rect.width === 0 || rect.height === 0) return;
-
-    const x = Math.min(
-      canvas.width - 1,
-      Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * canvas.width)),
-    );
-    const y = Math.min(
-      canvas.height - 1,
-      Math.max(0, Math.floor(((event.clientY - rect.top) / rect.height) * canvas.height)),
-    );
-    const [red, green, blue] = context.getImageData(x, y, 1, 1).data;
-    setSelectedColor(rgbToHex(red, green, blue));
-  };
+  const handleColorPick = (color: string) => setSelectedColor(color);
 
   const isImageLoaded = appState.imageSessionStatus === "loaded";
 
@@ -92,7 +75,7 @@ function App() {
           isLoading={isLoading}
           loadedImage={loadedImage}
           notice={notice}
-          onCanvasClick={handleCanvasClick}
+          onColorPick={handleColorPick}
           onFileSelect={(file) => void handleFile(file)}
           replacementColor={replacementColor}
           selectedColor={selectedColor}

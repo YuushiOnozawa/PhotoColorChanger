@@ -1,7 +1,12 @@
-import { useEffect, type MouseEvent, type RefObject } from "react";
-import { hexToRgb } from "../app/color";
-import { replaceSimilarColors } from "../app/colorReplacement";
+import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
+import { hexToRgb, rgbToHex } from "../app/color";
 import type { LoadedImage } from "../app/imageLoader";
+import {
+  createPreviewRenderer,
+  getPreviewMaxEdge,
+  replacementColorFromHex,
+  type PreviewRenderer,
+} from "../app/previewRenderer";
 import { imageUiText } from "../app/uiText";
 
 interface CanvasPanelProps {
@@ -10,7 +15,7 @@ interface CanvasPanelProps {
   isLoading: boolean;
   loadedImage: LoadedImage | null;
   notice: string | null;
-  onCanvasClick: (event: MouseEvent<HTMLCanvasElement>) => void;
+  onColorPick: (color: string) => void;
   onFileSelect: (file: File | undefined) => void;
   replacementColor: string;
   selectedColor: string | null;
@@ -23,31 +28,58 @@ function CanvasPanel({
   isLoading,
   loadedImage,
   notice,
-  onCanvasClick,
+  onColorPick,
   onFileSelect,
   replacementColor,
   selectedColor,
   tolerance,
 }: CanvasPanelProps) {
+  const rendererRef = useRef<PreviewRenderer | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !loadedImage) return;
 
-    canvas.width = loadedImage.width;
-    canvas.height = loadedImage.height;
-    const context = canvas.getContext("2d");
-    if (!context) return;
+    const renderer = createPreviewRenderer(canvas, getPreviewMaxEdge(window.innerWidth));
+    rendererRef.current = renderer;
+    canvas.dataset.renderer = renderer.kind;
 
-    context.drawImage(loadedImage.source, 0, 0, loadedImage.width, loadedImage.height);
+    return () => {
+      renderer.dispose();
+      rendererRef.current = null;
+      delete canvas.dataset.renderer;
+    };
+  }, [canvasRef, loadedImage]);
 
-    const target = selectedColor ? hexToRgb(selectedColor) : null;
-    const replacement = hexToRgb(replacementColor);
-    if (!target || !replacement) return;
+  useEffect(() => {
+    if (!loadedImage || !rendererRef.current) return;
 
-    const imageData = context.getImageData(0, 0, loadedImage.width, loadedImage.height);
-    imageData.data.set(replaceSimilarColors(imageData.data, target, replacement, tolerance));
-    context.putImageData(imageData, 0, 0);
-  }, [canvasRef, loadedImage, replacementColor, selectedColor, tolerance]);
+    rendererRef.current.render({
+      source: loadedImage.source,
+      width: loadedImage.width,
+      height: loadedImage.height,
+      targetColor: selectedColor ? hexToRgb(selectedColor) : null,
+      replacementColor: replacementColorFromHex(replacementColor),
+      tolerance,
+    });
+  }, [loadedImage, replacementColor, selectedColor, tolerance]);
+
+  const handleCanvasClick = (event: MouseEvent<HTMLCanvasElement>) => {
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const x = Math.min(
+      canvas.width - 1,
+      Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * canvas.width)),
+    );
+    const y = Math.min(
+      canvas.height - 1,
+      Math.max(0, Math.floor(((event.clientY - rect.top) / rect.height) * canvas.height)),
+    );
+    const color = rendererRef.current?.pick(x, y);
+    if (color) onColorPick(rgbToHex(...color));
+  };
 
   return (
     <section
@@ -85,7 +117,7 @@ function CanvasPanel({
             className="max-h-full max-w-full object-contain"
             role="img"
             aria-label={`${loadedImage.name}の画像`}
-            onClick={onCanvasClick}
+            onClick={handleCanvasClick}
           />
         ) : (
           <span>{isLoading ? imageUiText.status.loadingCanvas : imageUiText.canvas.empty}</span>

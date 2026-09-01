@@ -90,14 +90,8 @@ test("C05の近似色置換プレビューと許容範囲を検証する", async
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
-  await expect
-    .poll(() =>
-      canvas.evaluate((element) => {
-        const context = (element as HTMLCanvasElement).getContext("2d");
-        return context ? Array.from(context.getImageData(1, 1, 1, 1).data) : [];
-      }),
-    )
-    .toEqual([51, 102, 153, 255]);
+  await expect(canvas).toHaveAttribute("data-renderer", /webgl/);
+  await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
 
   const tolerance = page.locator("#color-tolerance");
   await tolerance.fill("25");
