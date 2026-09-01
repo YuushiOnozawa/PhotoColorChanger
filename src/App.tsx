@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
 import { imageUiText } from "./app/uiText";
+import { rgbToHex } from "./app/color";
 import "./styles.css";
 
 function App() {
@@ -10,6 +11,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [replacementColor, setReplacementColor] = useState("#ffffff");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -33,6 +36,7 @@ function App() {
     try {
       const nextImage = await loadImageFile(file);
       setLoadedImage(nextImage);
+      setSelectedColor(null);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
         setNotice(imageUiText.notices.resized);
@@ -46,6 +50,24 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCanvasClick = (event: MouseEvent<HTMLCanvasElement>) => {
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const context = canvas.getContext("2d");
+    if (!context || rect.width === 0 || rect.height === 0) return;
+
+    const x = Math.min(
+      canvas.width - 1,
+      Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * canvas.width)),
+    );
+    const y = Math.min(
+      canvas.height - 1,
+      Math.max(0, Math.floor(((event.clientY - rect.top) / rect.height) * canvas.height)),
+    );
+    const [red, green, blue] = context.getImageData(x, y, 1, 1).data;
+    setSelectedColor(rgbToHex(red, green, blue));
   };
 
   const isImageLoaded = appState.imageSessionStatus === "loaded";
@@ -97,6 +119,45 @@ function App() {
           <p className="mt-3 mb-0 text-[0.9rem] leading-[1.7] text-[#6e675e]">
             JPEG、PNG、WebPを選択するか、Canvasへドロップしてください。
           </p>
+          {isImageLoaded && (
+            <section className="mt-6" aria-labelledby="color-picker-title">
+              <h3 id="color-picker-title" className="mb-3 text-sm">
+                {imageUiText.colorPicker.title}
+              </h3>
+              <p className="mb-3 text-[0.9rem] leading-[1.7] text-[#6e675e]">
+                {imageUiText.colorPicker.hint}
+              </p>
+              <dl className="m-0 grid gap-3 text-[0.9rem]">
+                <div className="flex items-center justify-between gap-3">
+                  <dt>{imageUiText.colorPicker.targetLabel}</dt>
+                  <dd className="m-0 font-mono font-bold">
+                    <output aria-label="選択中の置換対象色">
+                      {selectedColor ?? imageUiText.colorPicker.unselected}
+                    </output>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>
+                    <label htmlFor="replacement-color">
+                      {imageUiText.colorPicker.replacementLabel}
+                    </label>
+                  </dt>
+                  <dd className="m-0 flex items-center gap-2">
+                    <input
+                      id="replacement-color"
+                      type="color"
+                      value={replacementColor}
+                      onChange={(event) => setReplacementColor(event.currentTarget.value)}
+                      aria-label={imageUiText.colorPicker.replacementLabel}
+                    />
+                    <output aria-label="置換後の色コード" className="font-mono font-bold">
+                      {replacementColor}
+                    </output>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          )}
           {errorMessage && (
             <p className="mt-4 mb-0 text-[0.9rem] leading-[1.7] text-[#b3261e]" role="alert">
               {errorMessage}
@@ -139,6 +200,7 @@ function App() {
                 className="max-h-full max-w-full object-contain"
                 role="img"
                 aria-label={`${loadedImage.name}の画像`}
+                onClick={handleCanvasClick}
               />
             ) : (
               <span>{isLoading ? imageUiText.status.loadingCanvas : imageUiText.canvas.empty}</span>

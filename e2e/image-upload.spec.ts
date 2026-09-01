@@ -40,7 +40,7 @@ test("C03の画像アップロード、Canvas表示、再選択を検証する",
   await expect(firstCanvas).toBeVisible();
   await expect(firstCanvas).toHaveJSProperty("width", 4);
   await expect(firstCanvas).toHaveJSProperty("height", 2);
-  await expect(page.getByRole("status")).toHaveText("first.png（4 × 2px）");
+  await expect(page.getByText("first.png（4 × 2px）", { exact: true })).toBeVisible();
 
   await fileInput.setInputFiles(await createPngFile(page, "second.png", 2, 4));
 
@@ -48,5 +48,28 @@ test("C03の画像アップロード、Canvas表示、再選択を検証する",
   await expect(secondCanvas).toBeVisible();
   await expect(secondCanvas).toHaveJSProperty("width", 2);
   await expect(secondCanvas).toHaveJSProperty("height", 4);
-  await expect(page.getByRole("status")).toHaveText("second.png（2 × 4px）");
+  await expect(page.getByText("second.png（2 × 4px）", { exact: true })).toBeVisible();
+});
+
+test("C04の対象色取得と置換後の色選択を検証する", async ({ page }) => {
+  await page.goto("/");
+  const fileInput = page.getByLabel("画像ファイル");
+
+  await fileInput.setInputFiles(await createPngFile(page, "color.png", 4, 2));
+
+  const canvas = page.getByRole("img", { name: "color.pngの画像" });
+  await expect(canvas).toBeVisible();
+  await canvas.click({ position: { x: 1, y: 1 } });
+
+  await expect(page.getByLabel("選択中の置換対象色")).toHaveText("#9a5634");
+  const replacementColor = page.locator("#replacement-color");
+  await expect(replacementColor).toHaveValue("#ffffff");
+  await replacementColor.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "#336699");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
 });

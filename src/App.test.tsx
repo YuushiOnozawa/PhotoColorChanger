@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
+import { rgbToHex } from "./app/color";
 
 afterEach(cleanup);
 
@@ -28,5 +29,11 @@ describe("初期画面", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("対応形式はJPEG、PNG、WebPです");
     expect(screen.getByText("画像未読み込み")).toBeInTheDocument();
+  });
+});
+
+describe("色選択", () => {
+  it("RGB値をHEX値へ変換する", () => {
+    expect(rgbToHex(154, 86, 52)).toBe("#9a5634");
   });
 });
