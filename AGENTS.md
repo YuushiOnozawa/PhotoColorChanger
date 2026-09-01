@@ -27,3 +27,10 @@
 - Never force-push `main` or rewrite its shared history.
 - Before branching, committing, or opening a pull request, inspect the working tree and preserve unrelated changes.
 - Keep commits focused and describe the relevant checks in the pull request.
+
+## CodeGraph
+
+- When CodeGraph MCP tools are available, use `codegraph_analyze_impact` before modifying existing functions or modules.
+- Use `codegraph_get_edit_context`, `codegraph_get_callers`, and `codegraph_get_callees` to confirm the change boundary and related tests.
+- Use CodeGraph for structural questions such as callers, dependencies, and impact; use the normal file tools for exact text, known paths, and edits.
+- If CodeGraph is unavailable or its index is stale, continue with the existing repository tools and state that limitation in the task notes.
