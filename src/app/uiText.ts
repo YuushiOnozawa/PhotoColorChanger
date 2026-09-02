@@ -14,6 +14,8 @@ export const imageUiText = {
     lineArt: "線画",
     thresholdLabel: "線画のしきい値",
     thresholdUnit: "%",
+    colorWeightLabel: "色差の重み",
+    colorWeightUnit: "%",
   },
   colorPicker: {
     title: "色を選択",
