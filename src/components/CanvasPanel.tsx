@@ -24,6 +24,7 @@ interface CanvasPanelProps {
   selectedColor: string | null;
   targetPoint: ImagePoint | null;
   tolerance: number;
+  colorEdgeWeight: number;
   lineThreshold: number;
 }
 
@@ -40,6 +41,7 @@ function CanvasPanel({
   selectedColor,
   targetPoint,
   tolerance,
+  colorEdgeWeight,
   lineThreshold,
 }: CanvasPanelProps) {
   const rendererRef = useRef<PreviewRenderer | null>(null);
@@ -78,10 +80,12 @@ function CanvasPanel({
       tolerance,
       mode: previewMode,
       lineThreshold,
+      colorEdgeWeight,
       targetPoint,
     });
   }, [
     loadedImage,
+    colorEdgeWeight,
     lineThreshold,
     previewMode,
     replacementColor,

@@ -35,8 +35,10 @@ describe("線画抽出", () => {
       pixels[index + 3] = 255;
     }
 
-    const result = createLineArtPixels(pixels, 3, 3, 4);
+    const result = createLineArtPixels(pixels, 3, 3, 4, 50);
+    const withoutColorEdge = createLineArtPixels(pixels, 3, 3, 4, 0);
 
     expect(result[(1 * 3 + 1) * 4]).toBe(0);
+    expect(withoutColorEdge[(1 * 3 + 1) * 4]).toBe(255);
   });
 });

@@ -20,6 +20,7 @@ export interface PreviewRenderOptions {
   tolerance: number;
   mode: PreviewMode;
   lineThreshold: number;
+  colorEdgeWeight: number;
   targetPoint: ImagePoint | null;
 }
 
@@ -56,6 +57,7 @@ uniform sampler2D u_regionMask;
 uniform bool u_hasRegionMask;
 uniform vec2 u_texelSize;
 uniform float u_lineThreshold;
+uniform float u_colorEdgeWeight;
 uniform bool u_showLineArt;
 varying vec2 v_texcoord;
 
@@ -87,7 +89,7 @@ float edgeStrength(vec2 uv) {
     bottomRightColor;
   float colorEdge = sqrt(dot(horizontalColor, horizontalColor) + dot(verticalColor, verticalColor)) /
     6.92820323;
-  return min(1.0, max(luminanceEdge, colorEdge * 0.5));
+  return min(1.0, max(luminanceEdge, colorEdge * u_colorEdgeWeight));
 }
 
 bool hasStrongEdge(vec2 uv, float threshold) {
@@ -210,6 +212,7 @@ function createWebGLRenderer(
   const hasRegionMaskLocation = gl.getUniformLocation(program, "u_hasRegionMask");
   const texelSizeLocation = gl.getUniformLocation(program, "u_texelSize");
   const lineThresholdLocation = gl.getUniformLocation(program, "u_lineThreshold");
+  const colorEdgeWeightLocation = gl.getUniformLocation(program, "u_colorEdgeWeight");
   const showLineArtLocation = gl.getUniformLocation(program, "u_showLineArt");
   const buffer = gl.createBuffer();
   const texture = gl.createTexture();
@@ -226,6 +229,7 @@ function createWebGLRenderer(
     !hasRegionMaskLocation ||
     !texelSizeLocation ||
     !lineThresholdLocation ||
+    !colorEdgeWeightLocation ||
     !showLineArtLocation ||
     !buffer ||
     !texture ||
@@ -302,6 +306,7 @@ function createWebGLRenderer(
       ...options.targetColor,
       options.tolerance,
       options.lineThreshold,
+      options.colorEdgeWeight,
     ].join(":");
     if (key !== regionMaskKey) {
       const sourceImage = sourceData.context.getImageData(
@@ -318,6 +323,7 @@ function createWebGLRenderer(
         options.targetPoint,
         options.tolerance,
         options.lineThreshold,
+        options.colorEdgeWeight,
       );
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, regionMaskTexture);
@@ -378,6 +384,10 @@ function createWebGLRenderer(
       gl.uniform1i(hasRegionMaskLocation, hasRegionMask ? 1 : 0);
       gl.uniform2f(texelSizeLocation, 1 / dimensions.width, 1 / dimensions.height);
       gl.uniform1f(lineThresholdLocation, Math.max(0, Math.min(100, options.lineThreshold)) / 100);
+      gl.uniform1f(
+        colorEdgeWeightLocation,
+        Math.max(0, Math.min(100, options.colorEdgeWeight)) / 100,
+      );
       gl.uniform1i(showLineArtLocation, options.mode === "lineArt" ? 1 : 0);
       gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -446,6 +456,7 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
             dimensions.width,
             dimensions.height,
             options.lineThreshold,
+            options.colorEdgeWeight,
           ),
         );
         context.putImageData(lineArt, 0, 0);
@@ -464,6 +475,7 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
             options.targetPoint,
             options.tolerance,
             options.lineThreshold,
+            options.colorEdgeWeight,
           )
         : undefined;
       imageData.data.set(

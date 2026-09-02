@@ -214,6 +214,11 @@ test("C15の線画プレビュー切替としきい値調整を検証する", as
 
   await lineThreshold.fill("80");
   await expect(lineThreshold).toHaveValue("80");
+  const colorEdgeWeight = page.getByRole("slider", { name: "色差の重み" });
+  await expect(colorEdgeWeight).toHaveValue("50");
+  await colorEdgeWeight.fill("0");
+  await expect(colorEdgeWeight).toHaveValue("0");
   await page.getByRole("button", { name: "色置換", exact: true }).click();
   await expect(lineThreshold).toHaveCount(0);
+  await expect(colorEdgeWeight).toHaveCount(0);
 });

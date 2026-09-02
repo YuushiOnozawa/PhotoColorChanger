@@ -1,6 +1,6 @@
 const SOBEL_SCALE = 4;
 const STRONG_EDGE_MULTIPLIER = 2.5;
-const COLOR_EDGE_WEIGHT = 0.5;
+export const DEFAULT_COLOR_EDGE_WEIGHT = 50;
 
 type Rgb = readonly [number, number, number];
 
@@ -31,6 +31,7 @@ function edgeStrength(
   height: number,
   x: number,
   y: number,
+  colorEdgeWeight: number,
 ): number {
   const topLeft = sampleRgb(pixels, width, height, x - 1, y - 1);
   const top = sampleRgb(pixels, width, height, x, y - 1);
@@ -66,7 +67,7 @@ function edgeStrength(
     topLeft[2] + 2 * top[2] + topRight[2] - bottomLeft[2] - 2 * bottom[2] - bottomRight[2],
   ];
   const colorEdge = Math.hypot(...horizontalColor, ...verticalColor) / (SOBEL_SCALE * Math.sqrt(3));
-  return Math.min(1, Math.max(luminanceEdge, colorEdge * COLOR_EDGE_WEIGHT));
+  return Math.min(1, Math.max(luminanceEdge, colorEdge * (clamp(colorEdgeWeight, 0, 100) / 100)));
 }
 
 export function createLineArtMask(
@@ -74,6 +75,7 @@ export function createLineArtMask(
   width: number,
   height: number,
   threshold: number,
+  colorEdgeWeight = DEFAULT_COLOR_EDGE_WEIGHT,
 ): Uint8Array {
   const result = new Uint8Array(width * height);
   const strengths = new Float32Array(width * height);
@@ -82,7 +84,7 @@ export function createLineArtMask(
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      strengths[y * width + x] = edgeStrength(pixels, width, height, x, y);
+      strengths[y * width + x] = edgeStrength(pixels, width, height, x, y, colorEdgeWeight);
     }
   }
 
@@ -112,9 +114,10 @@ export function createLineArtPixels(
   width: number,
   height: number,
   threshold: number,
+  colorEdgeWeight = DEFAULT_COLOR_EDGE_WEIGHT,
 ): Uint8ClampedArray {
   const result = new Uint8ClampedArray(width * height * 4);
-  const mask = createLineArtMask(pixels, width, height, threshold);
+  const mask = createLineArtMask(pixels, width, height, threshold, colorEdgeWeight);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {

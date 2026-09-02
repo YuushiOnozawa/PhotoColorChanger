@@ -7,10 +7,12 @@ interface ToolsPanelProps {
   isImageLoaded: boolean;
   isLoading: boolean;
   onFileSelect: (file: File | undefined) => void;
+  onColorEdgeWeightChange: (weight: number) => void;
   onLineThresholdChange: (threshold: number) => void;
   onPreviewModeChange: (mode: PreviewMode) => void;
   onReplacementColorChange: (color: string) => void;
   onToleranceChange: (tolerance: number) => void;
+  colorEdgeWeight: number;
   lineThreshold: number;
   previewMode: PreviewMode;
   replacementColor: string;
@@ -23,11 +25,13 @@ function ToolsPanel({
   isImageLoaded,
   isLoading,
   onFileSelect,
+  onColorEdgeWeightChange,
   onLineThresholdChange,
   onPreviewModeChange,
   onReplacementColorChange,
   onToleranceChange,
   lineThreshold,
+  colorEdgeWeight,
   previewMode,
   replacementColor,
   selectedColor,
@@ -91,26 +95,52 @@ function ToolsPanel({
               ))}
             </div>
             {previewMode === "lineArt" && (
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <label htmlFor="line-threshold">{imageUiText.preview.thresholdLabel}</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="line-threshold"
-                    type="range"
-                    min="1"
-                    max="100"
-                    step="1"
-                    value={lineThreshold}
-                    onChange={(event) => onLineThresholdChange(Number(event.currentTarget.value))}
-                    aria-label={imageUiText.preview.thresholdLabel}
-                  />
-                  <output
-                    aria-label={`${imageUiText.preview.thresholdLabel}の値`}
-                    className="font-mono font-bold"
-                  >
-                    {lineThreshold}
-                    {imageUiText.preview.thresholdUnit}
-                  </output>
+              <div className="mt-3 grid gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="line-threshold">{imageUiText.preview.thresholdLabel}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="line-threshold"
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={lineThreshold}
+                      onChange={(event) => onLineThresholdChange(Number(event.currentTarget.value))}
+                      aria-label={imageUiText.preview.thresholdLabel}
+                    />
+                    <output
+                      aria-label={`${imageUiText.preview.thresholdLabel}の値`}
+                      className="font-mono font-bold"
+                    >
+                      {lineThreshold}
+                      {imageUiText.preview.thresholdUnit}
+                    </output>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="color-edge-weight">{imageUiText.preview.colorWeightLabel}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="color-edge-weight"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={colorEdgeWeight}
+                      onChange={(event) =>
+                        onColorEdgeWeightChange(Number(event.currentTarget.value))
+                      }
+                      aria-label={imageUiText.preview.colorWeightLabel}
+                    />
+                    <output
+                      aria-label={`${imageUiText.preview.colorWeightLabel}の値`}
+                      className="font-mono font-bold"
+                    >
+                      {colorEdgeWeight}
+                      {imageUiText.preview.colorWeightUnit}
+                    </output>
+                  </div>
                 </div>
               </div>
             )}
