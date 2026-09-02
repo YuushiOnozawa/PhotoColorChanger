@@ -1,21 +1,28 @@
 const SOBEL_SCALE = 4;
 const STRONG_EDGE_MULTIPLIER = 2.5;
+const COLOR_EDGE_WEIGHT = 0.5;
+
+type Rgb = readonly [number, number, number];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function luminance(
+function sampleRgb(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
   x: number,
   y: number,
-): number {
+): Rgb {
   const safeX = clamp(x, 0, width - 1);
   const safeY = clamp(y, 0, height - 1);
   const index = (safeY * width + safeX) * 4;
-  return (pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114) / 255;
+  return [pixels[index] / 255, pixels[index + 1] / 255, pixels[index + 2] / 255];
+}
+
+function luminance(color: Rgb): number {
+  return color[0] * 0.299 + color[1] * 0.587 + color[2] * 0.114;
 }
 
 function edgeStrength(
@@ -25,17 +32,41 @@ function edgeStrength(
   x: number,
   y: number,
 ): number {
-  const topLeft = luminance(pixels, width, height, x - 1, y - 1);
-  const top = luminance(pixels, width, height, x, y - 1);
-  const topRight = luminance(pixels, width, height, x + 1, y - 1);
-  const left = luminance(pixels, width, height, x - 1, y);
-  const right = luminance(pixels, width, height, x + 1, y);
-  const bottomLeft = luminance(pixels, width, height, x - 1, y + 1);
-  const bottom = luminance(pixels, width, height, x, y + 1);
-  const bottomRight = luminance(pixels, width, height, x + 1, y + 1);
-  const horizontal = -topLeft + topRight - 2 * left + 2 * right - bottomLeft + bottomRight;
-  const vertical = topLeft + 2 * top + topRight - bottomLeft - 2 * bottom - bottomRight;
-  return Math.min(1, Math.hypot(horizontal, vertical) / SOBEL_SCALE);
+  const topLeft = sampleRgb(pixels, width, height, x - 1, y - 1);
+  const top = sampleRgb(pixels, width, height, x, y - 1);
+  const topRight = sampleRgb(pixels, width, height, x + 1, y - 1);
+  const left = sampleRgb(pixels, width, height, x - 1, y);
+  const right = sampleRgb(pixels, width, height, x + 1, y);
+  const bottomLeft = sampleRgb(pixels, width, height, x - 1, y + 1);
+  const bottom = sampleRgb(pixels, width, height, x, y + 1);
+  const bottomRight = sampleRgb(pixels, width, height, x + 1, y + 1);
+  const horizontalLuminance =
+    -luminance(topLeft) +
+    luminance(topRight) -
+    2 * luminance(left) +
+    2 * luminance(right) -
+    luminance(bottomLeft) +
+    luminance(bottomRight);
+  const verticalLuminance =
+    luminance(topLeft) +
+    2 * luminance(top) +
+    luminance(topRight) -
+    luminance(bottomLeft) -
+    2 * luminance(bottom) -
+    luminance(bottomRight);
+  const luminanceEdge = Math.hypot(horizontalLuminance, verticalLuminance) / SOBEL_SCALE;
+  const horizontalColor: Rgb = [
+    -topLeft[0] + topRight[0] - 2 * left[0] + 2 * right[0] - bottomLeft[0] + bottomRight[0],
+    -topLeft[1] + topRight[1] - 2 * left[1] + 2 * right[1] - bottomLeft[1] + bottomRight[1],
+    -topLeft[2] + topRight[2] - 2 * left[2] + 2 * right[2] - bottomLeft[2] + bottomRight[2],
+  ];
+  const verticalColor: Rgb = [
+    topLeft[0] + 2 * top[0] + topRight[0] - bottomLeft[0] - 2 * bottom[0] - bottomRight[0],
+    topLeft[1] + 2 * top[1] + topRight[1] - bottomLeft[1] - 2 * bottom[1] - bottomRight[1],
+    topLeft[2] + 2 * top[2] + topRight[2] - bottomLeft[2] - 2 * bottom[2] - bottomRight[2],
+  ];
+  const colorEdge = Math.hypot(...horizontalColor, ...verticalColor) / (SOBEL_SCALE * Math.sqrt(3));
+  return Math.min(1, Math.max(luminanceEdge, colorEdge * COLOR_EDGE_WEIGHT));
 }
 
 export function createLineArtMask(

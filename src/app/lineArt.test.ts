@@ -24,4 +24,19 @@ describe("線画抽出", () => {
 
     expect(result[4 * 1 + 0]).toBe(0);
   });
+
+  it("明るさが近い色の境界も線として抽出する", () => {
+    const pixels = new Uint8ClampedArray(3 * 3 * 4);
+    for (let index = 0; index < pixels.length; index += 4) {
+      const color = index % (3 * 4) === 8 ? [0, 170, 0] : [100, 100, 100];
+      pixels[index] = color[0];
+      pixels[index + 1] = color[1];
+      pixels[index + 2] = color[2];
+      pixels[index + 3] = 255;
+    }
+
+    const result = createLineArtPixels(pixels, 3, 3, 4);
+
+    expect(result[(1 * 3 + 1) * 4]).toBe(0);
+  });
 });

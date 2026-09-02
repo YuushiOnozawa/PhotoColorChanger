@@ -64,17 +64,30 @@ float luminance(vec3 color) {
 }
 
 float edgeStrength(vec2 uv) {
-  float topLeft = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, -1.0)).rgb);
-  float top = luminance(texture2D(u_image, uv + u_texelSize * vec2(0.0, -1.0)).rgb);
-  float topRight = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, -1.0)).rgb);
-  float left = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, 0.0)).rgb);
-  float right = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, 0.0)).rgb);
-  float bottomLeft = luminance(texture2D(u_image, uv + u_texelSize * vec2(-1.0, 1.0)).rgb);
-  float bottom = luminance(texture2D(u_image, uv + u_texelSize * vec2(0.0, 1.0)).rgb);
-  float bottomRight = luminance(texture2D(u_image, uv + u_texelSize * vec2(1.0, 1.0)).rgb);
-  float horizontal = -topLeft + topRight - 2.0 * left + 2.0 * right - bottomLeft + bottomRight;
-  float vertical = topLeft + 2.0 * top + topRight - bottomLeft - 2.0 * bottom - bottomRight;
-  return min(1.0, length(vec2(horizontal, vertical)) / 4.0);
+  vec3 topLeftColor = texture2D(u_image, uv + u_texelSize * vec2(-1.0, -1.0)).rgb;
+  vec3 topColor = texture2D(u_image, uv + u_texelSize * vec2(0.0, -1.0)).rgb;
+  vec3 topRightColor = texture2D(u_image, uv + u_texelSize * vec2(1.0, -1.0)).rgb;
+  vec3 leftColor = texture2D(u_image, uv + u_texelSize * vec2(-1.0, 0.0)).rgb;
+  vec3 rightColor = texture2D(u_image, uv + u_texelSize * vec2(1.0, 0.0)).rgb;
+  vec3 bottomLeftColor = texture2D(u_image, uv + u_texelSize * vec2(-1.0, 1.0)).rgb;
+  vec3 bottomColor = texture2D(u_image, uv + u_texelSize * vec2(0.0, 1.0)).rgb;
+  vec3 bottomRightColor = texture2D(u_image, uv + u_texelSize * vec2(1.0, 1.0)).rgb;
+  float horizontal =
+    -luminance(topLeftColor) + luminance(topRightColor) - 2.0 * luminance(leftColor) +
+    2.0 * luminance(rightColor) - luminance(bottomLeftColor) + luminance(bottomRightColor);
+  float vertical =
+    luminance(topLeftColor) + 2.0 * luminance(topColor) + luminance(topRightColor) -
+    luminance(bottomLeftColor) - 2.0 * luminance(bottomColor) - luminance(bottomRightColor);
+  float luminanceEdge = length(vec2(horizontal, vertical)) / 4.0;
+  vec3 horizontalColor =
+    -topLeftColor + topRightColor - 2.0 * leftColor + 2.0 * rightColor - bottomLeftColor +
+    bottomRightColor;
+  vec3 verticalColor =
+    topLeftColor + 2.0 * topColor + topRightColor - bottomLeftColor - 2.0 * bottomColor -
+    bottomRightColor;
+  float colorEdge = sqrt(dot(horizontalColor, horizontalColor) + dot(verticalColor, verticalColor)) /
+    6.92820323;
+  return min(1.0, max(luminanceEdge, colorEdge * 0.5));
 }
 
 bool hasStrongEdge(vec2 uv, float threshold) {
