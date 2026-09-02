@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { ImagePoint } from "./app/colorReplacement";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
 import type { PreviewMode } from "./app/previewRenderer";
@@ -16,6 +17,7 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<ImagePoint | null>(null);
   const [replacementColor, setReplacementColor] = useState("#ffffff");
   const [tolerance, setTolerance] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
@@ -33,6 +35,7 @@ function App() {
       const nextImage = await loadImageFile(file);
       setLoadedImage(nextImage);
       setSelectedColor(null);
+      setSelectedPoint(null);
       setTolerance(0);
       setPreviewMode("replacement");
       setLineThreshold(20);
@@ -51,7 +54,10 @@ function App() {
     }
   };
 
-  const handleColorPick = (color: string) => setSelectedColor(color);
+  const handleColorPick = (color: string, point: ImagePoint) => {
+    setSelectedColor(color);
+    setSelectedPoint(point);
+  };
 
   const isImageLoaded = appState.imageSessionStatus === "loaded";
 
@@ -89,6 +95,7 @@ function App() {
           previewMode={previewMode}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
+          targetPoint={selectedPoint}
           tolerance={tolerance}
           lineThreshold={lineThreshold}
         />

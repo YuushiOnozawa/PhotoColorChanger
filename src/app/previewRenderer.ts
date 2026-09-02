@@ -1,5 +1,9 @@
 import { hexToRgb } from "./color";
-import { replaceSimilarColors } from "./colorReplacement";
+import {
+  createConnectedRegionMask,
+  replaceSimilarColors,
+  type ImagePoint,
+} from "./colorReplacement";
 import { fitImageDimensions } from "./imageLoader";
 import { createLineArtPixels } from "./lineArt";
 
@@ -16,6 +20,7 @@ export interface PreviewRenderOptions {
   tolerance: number;
   mode: PreviewMode;
   lineThreshold: number;
+  targetPoint: ImagePoint | null;
 }
 
 export interface PreviewRenderer {
@@ -47,6 +52,8 @@ uniform vec3 u_target;
 uniform vec3 u_replacement;
 uniform float u_tolerance;
 uniform bool u_hasTarget;
+uniform sampler2D u_regionMask;
+uniform bool u_hasRegionMask;
 uniform vec2 u_texelSize;
 uniform float u_lineThreshold;
 uniform bool u_showLineArt;
@@ -70,15 +77,37 @@ float edgeStrength(vec2 uv) {
   return min(1.0, length(vec2(horizontal, vertical)) / 4.0);
 }
 
+bool hasStrongEdge(vec2 uv, float threshold) {
+  return edgeStrength(uv) >= threshold;
+}
+
+bool hasStrongNeighbor(vec2 uv, float threshold) {
+  return hasStrongEdge(uv, threshold) ||
+    hasStrongEdge(uv + u_texelSize * vec2(-1.0, 0.0), threshold) ||
+    hasStrongEdge(uv + u_texelSize * vec2(1.0, 0.0), threshold) ||
+    hasStrongEdge(uv + u_texelSize * vec2(0.0, -1.0), threshold) ||
+    hasStrongEdge(uv + u_texelSize * vec2(0.0, 1.0), threshold);
+}
+
 void main() {
   vec4 source = texture2D(u_image, v_texcoord);
   if (u_showLineArt) {
-    float line = step(max(0.01, u_lineThreshold), edgeStrength(v_texcoord));
+    float weakThreshold = max(0.01, u_lineThreshold);
+    float strongThreshold = min(1.0, weakThreshold * 2.5);
+    float edge = edgeStrength(v_texcoord);
+    float line = step(weakThreshold, edge) * (hasStrongNeighbor(v_texcoord, strongThreshold) ? 1.0 : 0.0);
     gl_FragColor = vec4(vec3(1.0 - line), source.a);
     return;
   }
-  float colorDistance = distance(source.rgb, u_target);
-  gl_FragColor = u_hasTarget && colorDistance <= u_tolerance
+  if (!u_hasTarget) {
+    gl_FragColor = source;
+    return;
+  }
+  if (u_hasRegionMask && texture2D(u_regionMask, v_texcoord).r <= 0.5) {
+    gl_FragColor = source;
+    return;
+  }
+  gl_FragColor = distance(source.rgb, u_target) <= u_tolerance
     ? vec4(u_replacement, source.a)
     : source;
 }
@@ -90,6 +119,19 @@ export function getPreviewMaxEdge(viewportWidth: number): number {
 
 function getPreviewDimensions(width: number, height: number, maxEdge: number) {
   return fitImageDimensions(width, height, maxEdge);
+}
+
+function toRgbaMask(mask: Uint8Array): Uint8Array {
+  const pixels = new Uint8Array(mask.length * 4);
+  for (let index = 0; index < mask.length; index += 1) {
+    const value = mask[index] * 255;
+    const pixelIndex = index * 4;
+    pixels[pixelIndex] = value;
+    pixels[pixelIndex + 1] = value;
+    pixels[pixelIndex + 2] = value;
+    pixels[pixelIndex + 3] = 255;
+  }
+  return pixels;
 }
 
 function createSourceCanvas(): {
@@ -151,11 +193,14 @@ function createWebGLRenderer(
   const replacementLocation = gl.getUniformLocation(program, "u_replacement");
   const toleranceLocation = gl.getUniformLocation(program, "u_tolerance");
   const hasTargetLocation = gl.getUniformLocation(program, "u_hasTarget");
+  const regionMaskLocation = gl.getUniformLocation(program, "u_regionMask");
+  const hasRegionMaskLocation = gl.getUniformLocation(program, "u_hasRegionMask");
   const texelSizeLocation = gl.getUniformLocation(program, "u_texelSize");
   const lineThresholdLocation = gl.getUniformLocation(program, "u_lineThreshold");
   const showLineArtLocation = gl.getUniformLocation(program, "u_showLineArt");
   const buffer = gl.createBuffer();
   const texture = gl.createTexture();
+  const regionMaskTexture = gl.createTexture();
   if (
     positionLocation < 0 ||
     texcoordLocation < 0 ||
@@ -164,11 +209,14 @@ function createWebGLRenderer(
     !replacementLocation ||
     !toleranceLocation ||
     !hasTargetLocation ||
+    !regionMaskLocation ||
+    !hasRegionMaskLocation ||
     !texelSizeLocation ||
     !lineThresholdLocation ||
     !showLineArtLocation ||
     !buffer ||
-    !texture
+    !texture ||
+    !regionMaskTexture
   ) {
     throw new Error("WebGL resource creation failed");
   }
@@ -191,11 +239,20 @@ function createWebGLRenderer(
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.uniform1i(imageLocation, 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, regionMaskTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.uniform1i(regionMaskLocation, 1);
+  gl.activeTexture(gl.TEXTURE0);
 
   const sourceData = createSourceCanvas();
   let source: CanvasImageSource | null = null;
   let sourceWidth = 0;
   let sourceHeight = 0;
+  let regionMaskKey = "";
 
   const ensureSource = (options: PreviewRenderOptions) => {
     const dimensions = getPreviewDimensions(options.width, options.height, maxPreviewEdge);
@@ -210,11 +267,62 @@ function createWebGLRenderer(
       source = options.source;
       sourceWidth = dimensions.width;
       sourceHeight = dimensions.height;
+      regionMaskKey = "";
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceData.canvas);
     }
     return dimensions;
+  };
+
+  const ensureRegionMask = (
+    options: PreviewRenderOptions,
+    dimensions: { width: number; height: number },
+  ) => {
+    if (options.mode !== "replacement" || !options.targetColor || !options.targetPoint)
+      return false;
+
+    const key = [
+      dimensions.width,
+      dimensions.height,
+      ...options.targetPoint,
+      ...options.targetColor,
+      options.tolerance,
+      options.lineThreshold,
+    ].join(":");
+    if (key !== regionMaskKey) {
+      const sourceImage = sourceData.context.getImageData(
+        0,
+        0,
+        dimensions.width,
+        dimensions.height,
+      );
+      const regionMask = createConnectedRegionMask(
+        sourceImage.data,
+        dimensions.width,
+        dimensions.height,
+        options.targetColor,
+        options.targetPoint,
+        options.tolerance,
+        options.lineThreshold,
+      );
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, regionMaskTexture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        dimensions.width,
+        dimensions.height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        toRgbaMask(regionMask),
+      );
+      regionMaskKey = key;
+    }
+    gl.activeTexture(gl.TEXTURE0);
+    return true;
   };
 
   return {
@@ -226,6 +334,7 @@ function createWebGLRenderer(
         canvas.height = dimensions.height;
       }
       ensureSource(options);
+      const hasRegionMask = ensureRegionMask(options, dimensions);
       gl.viewport(0, 0, dimensions.width, dimensions.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -237,6 +346,8 @@ function createWebGLRenderer(
       gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 16, 8);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, regionMaskTexture);
       const targetColor = options.targetColor ?? [0, 0, 0];
       gl.uniform3fv(
         targetLocation,
@@ -251,9 +362,11 @@ function createWebGLRenderer(
         (Math.max(0, Math.min(100, options.tolerance)) / 100) * Math.sqrt(3) + Math.sqrt(3) / 255,
       );
       gl.uniform1i(hasTargetLocation, options.targetColor ? 1 : 0);
+      gl.uniform1i(hasRegionMaskLocation, hasRegionMask ? 1 : 0);
       gl.uniform2f(texelSizeLocation, 1 / dimensions.width, 1 / dimensions.height);
       gl.uniform1f(lineThresholdLocation, Math.max(0, Math.min(100, options.lineThreshold)) / 100);
       gl.uniform1i(showLineArtLocation, options.mode === "lineArt" ? 1 : 0);
+      gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     },
     pick(x, y) {
@@ -265,6 +378,7 @@ function createWebGLRenderer(
     },
     dispose() {
       gl.deleteTexture(texture);
+      gl.deleteTexture(regionMaskTexture);
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
     },
@@ -328,12 +442,24 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
       if (!options.targetColor) return;
 
       const imageData = context.getImageData(0, 0, dimensions.width, dimensions.height);
+      const regionMask = options.targetPoint
+        ? createConnectedRegionMask(
+            sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+            dimensions.width,
+            dimensions.height,
+            options.targetColor,
+            options.targetPoint,
+            options.tolerance,
+            options.lineThreshold,
+          )
+        : undefined;
       imageData.data.set(
         replaceSimilarColors(
           imageData.data,
           options.targetColor,
           options.replacementColor,
           options.tolerance,
+          regionMask,
         ),
       );
       context.putImageData(imageData, 0, 0);

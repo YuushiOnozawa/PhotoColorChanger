@@ -30,6 +30,36 @@ async function createPngFile(page: Page, name: string, width: number, height: nu
   };
 }
 
+async function createSeparatedPngFile(page: Page) {
+  const bytes = await page.evaluate(async () => {
+    const source = document.createElement("canvas");
+    source.width = 6;
+    source.height = 2;
+    const context = source.getContext("2d");
+    if (!context) throw new Error("Canvas context is unavailable");
+
+    context.fillStyle = "#9a5634";
+    context.fillRect(0, 0, 2, 2);
+    context.fillRect(4, 0, 2, 2);
+    context.fillStyle = "#000000";
+    context.fillRect(2, 0, 2, 2);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      source.toBlob((value) => {
+        if (value) resolve(value);
+        else reject(new Error("PNG conversion failed"));
+      }, "image/png");
+    });
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+
+  return {
+    name: "connected-region.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(bytes),
+  };
+}
+
 async function createEdgePngFile(page: Page) {
   const bytes = await page.evaluate(async () => {
     const source = document.createElement("canvas");
@@ -148,6 +178,23 @@ test("C05の近似色置換プレビューと許容範囲を検証する", async
   const tolerance = page.locator("#color-tolerance");
   await tolerance.fill("25");
   await expect(page.getByLabel("許容範囲の値")).toHaveText("25%");
+});
+
+test("C16のクリック地点から連結領域だけを置換する", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("画像ファイル").setInputFiles(await createSeparatedPngFile(page));
+
+  const canvas = page.getByRole("img", { name: "connected-region.pngの画像" });
+  await canvas.click({ position: { x: 1, y: 1 } });
+  await page.locator("#replacement-color").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "#336699");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.getByLabel("選択中の置換対象色")).toHaveText("#9a5634");
+  await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
 });
 
 test("C15の線画プレビュー切替としきい値調整を検証する", async ({ page }) => {
