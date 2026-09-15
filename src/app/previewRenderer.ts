@@ -1,11 +1,11 @@
 import { hexToRgb } from "./color";
 import { replaceSimilarColors } from "./colorReplacement";
 import { fitImageDimensions } from "./imageLoader";
-import { createLineArtPixels } from "./lineArt";
+import { createLineArtPixels, createXdogPixels, createXdogSobelPixels } from "./lineArt";
 
 export type RgbColor = readonly [number, number, number];
 export type PreviewRendererKind = "webgl2" | "webgl" | "2d";
-export type PreviewMode = "replacement" | "lineArt";
+export type PreviewMode = "replacement" | "lineArt" | "lineArtXdog" | "lineArtXdogSobel";
 
 export interface PreviewRenderOptions {
   source: CanvasImageSource;
@@ -16,6 +16,7 @@ export interface PreviewRenderOptions {
   tolerance: number;
   mode: PreviewMode;
   lineThreshold: number;
+  xdogThreshold: number;
 }
 
 export interface PreviewRenderer {
@@ -193,9 +194,11 @@ function createWebGLRenderer(
   gl.uniform1i(imageLocation, 0);
 
   const sourceData = createSourceCanvas();
+  const processedData = createSourceCanvas();
   let source: CanvasImageSource | null = null;
   let sourceWidth = 0;
   let sourceHeight = 0;
+  let textureContent: "source" | "xdog" = "source";
 
   const ensureSource = (options: PreviewRenderOptions) => {
     const dimensions = getPreviewDimensions(options.width, options.height, maxPreviewEdge);
@@ -213,6 +216,7 @@ function createWebGLRenderer(
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceData.canvas);
+      textureContent = "source";
     }
     return dimensions;
   };
@@ -226,6 +230,44 @@ function createWebGLRenderer(
         canvas.height = dimensions.height;
       }
       ensureSource(options);
+      if (options.mode === "lineArtXdog" || options.mode === "lineArtXdogSobel") {
+        const sourceImage = sourceData.context.getImageData(
+          0,
+          0,
+          dimensions.width,
+          dimensions.height,
+        );
+        processedData.canvas.width = dimensions.width;
+        processedData.canvas.height = dimensions.height;
+        const processedImage = processedData.context.createImageData(
+          dimensions.width,
+          dimensions.height,
+        );
+        processedImage.data.set(
+          options.mode === "lineArtXdog"
+            ? createXdogPixels(
+                sourceImage.data,
+                dimensions.width,
+                dimensions.height,
+                options.xdogThreshold,
+              )
+            : createXdogSobelPixels(
+                sourceImage.data,
+                dimensions.width,
+                dimensions.height,
+                options.xdogThreshold,
+                options.lineThreshold,
+              ),
+        );
+        processedData.context.putImageData(processedImage, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, processedData.canvas);
+        textureContent = "xdog";
+      } else if (textureContent === "xdog") {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceData.canvas);
+        textureContent = "source";
+      }
       gl.viewport(0, 0, dimensions.width, dimensions.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -305,7 +347,11 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
         canvas.height = dimensions.height;
       }
       context.clearRect(0, 0, dimensions.width, dimensions.height);
-      if (options.mode === "lineArt") {
+      if (
+        options.mode === "lineArt" ||
+        options.mode === "lineArtXdog" ||
+        options.mode === "lineArtXdogSobel"
+      ) {
         const sourceImage = sourceData.context.getImageData(
           0,
           0,
@@ -314,12 +360,27 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
         );
         const lineArt = context.createImageData(dimensions.width, dimensions.height);
         lineArt.data.set(
-          createLineArtPixels(
-            sourceImage.data,
-            dimensions.width,
-            dimensions.height,
-            options.lineThreshold,
-          ),
+          options.mode === "lineArt"
+            ? createLineArtPixels(
+                sourceImage.data,
+                dimensions.width,
+                dimensions.height,
+                options.lineThreshold,
+              )
+            : options.mode === "lineArtXdog"
+              ? createXdogPixels(
+                  sourceImage.data,
+                  dimensions.width,
+                  dimensions.height,
+                  options.xdogThreshold,
+                )
+              : createXdogSobelPixels(
+                  sourceImage.data,
+                  dimensions.width,
+                  dimensions.height,
+                  options.xdogThreshold,
+                  options.lineThreshold,
+                ),
         );
         context.putImageData(lineArt, 0, 0);
         return;

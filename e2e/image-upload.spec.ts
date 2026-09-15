@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 async function createPngFile(page: Page, name: string, width: number, height: number) {
@@ -158,15 +159,65 @@ test("C15の線画プレビュー切替としきい値調整を検証する", as
   await expect(canvas).toBeVisible();
   await page.getByRole("button", { name: "線画", exact: true }).click();
 
-  const lineThreshold = page.getByRole("slider", { name: "線画のしきい値" });
+  const lineThreshold = page.getByRole("slider", { name: "Sobelのしきい値" });
   await expect(lineThreshold).toHaveValue("20");
   await expect(page.getByRole("button", { name: "線画", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await expect(canvas).toHaveScreenshot("line-art-c15.png", { animations: "disabled" });
+  await page.getByRole("button", { name: "XDoG", exact: true }).click();
+  await expect(page.getByRole("button", { name: "XDoG", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(canvas).toHaveScreenshot("line-art-xdog-c15.png", { animations: "disabled" });
+  const xdogThreshold = page.getByRole("slider", { name: "XDoGのしきい値" });
+  await expect(xdogThreshold).toHaveValue("20");
+  await page.getByRole("button", { name: "XDoG→Sobel", exact: true }).click();
+  await expect(page.getByRole("slider", { name: "XDoGのしきい値" })).toHaveValue("20");
+  await expect(page.getByRole("slider", { name: "Sobelのしきい値" })).toHaveValue("20");
+  await page.getByRole("slider", { name: "XDoGのしきい値" }).fill("15");
+  await page.getByRole("slider", { name: "Sobelのしきい値" }).fill("10");
+  await expect(canvas).toHaveScreenshot("line-art-xdog-sobel-c15.png", { animations: "disabled" });
+  await page.getByRole("button", { name: "線画", exact: true }).click();
 
   await lineThreshold.fill("80");
   await expect(lineThreshold).toHaveValue("80");
   await page.getByRole("button", { name: "色置換", exact: true }).click();
   await expect(lineThreshold).toHaveCount(0);
 });
+
+for (const fixture of ["c15-original.png", "c15-line-art.png"]) {
+  test(`DOCサンプル ${fixture} の線画プレビューを検証する`, async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("画像ファイル").setInputFiles(resolve("docs/screenshots", fixture));
+
+    const canvas = page.getByRole("img", { name: `${fixture}の画像` });
+    await expect(canvas).toBeVisible();
+    await page.getByRole("button", { name: "線画", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`docs-${fixture}`, { animations: "disabled" });
+  });
+}
+
+const exampleDirectory = process.env.PCC_EXAMPLE_DIR ?? resolve("example");
+
+for (const fixture of ["sample1.jpeg", "sample2.jpeg"]) {
+  test(`EXAMPLE ${fixture} の線画プレビューを検証する`, async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("画像ファイル").setInputFiles(resolve(exampleDirectory, fixture));
+
+    const canvas = page.getByRole("img", { name: `${fixture}の画像` });
+    await expect(canvas).toBeVisible();
+    await page.getByRole("button", { name: "線画", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`example-${fixture}.png`, { animations: "disabled" });
+    await page.getByRole("button", { name: "XDoG", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`example-${fixture}-xdog.png`, {
+      animations: "disabled",
+    });
+    await page.getByRole("button", { name: "XDoG→Sobel", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`example-${fixture}-xdog-sobel.png`, {
+      animations: "disabled",
+    });
+  });
+}

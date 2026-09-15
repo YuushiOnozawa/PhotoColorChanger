@@ -20,6 +20,7 @@ function App() {
   const [tolerance, setTolerance] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
   const [lineThreshold, setLineThreshold] = useState(20);
+  const [xdogThreshold, setXdogThreshold] = useState(20);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleFile = async (file: File | undefined) => {
@@ -36,6 +37,7 @@ function App() {
       setTolerance(0);
       setPreviewMode("replacement");
       setLineThreshold(20);
+      setXdogThreshold(20);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
         setNotice(imageUiText.notices.resized);
@@ -72,8 +74,10 @@ function App() {
           onToleranceChange={setTolerance}
           onPreviewModeChange={setPreviewMode}
           onLineThresholdChange={setLineThreshold}
+          onXdogThresholdChange={setXdogThreshold}
           previewMode={previewMode}
           lineThreshold={lineThreshold}
+          xdogThreshold={xdogThreshold}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
           tolerance={tolerance}
@@ -91,6 +95,7 @@ function App() {
           selectedColor={selectedColor}
           tolerance={tolerance}
           lineThreshold={lineThreshold}
+          xdogThreshold={xdogThreshold}
         />
         <HistoryPanel />
       </div>
