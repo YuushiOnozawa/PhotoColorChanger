@@ -1,7 +1,7 @@
 import { hexToRgb } from "./color";
 import { replaceSimilarColors } from "./colorReplacement";
 import { fitImageDimensions } from "./imageLoader";
-import { createLineArtPixels, createXdogPixels, createXdogSobelPixels } from "./lineArt";
+import { createLineArtPixels, createXdogPixels } from "./lineArt";
 
 export type RgbColor = readonly [number, number, number];
 export type PreviewRendererKind = "webgl2" | "webgl" | "2d";
@@ -101,6 +101,37 @@ function createSourceCanvas(): {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas context is unavailable");
   return { canvas, context };
+}
+
+interface XdogCacheEntry {
+  height: number;
+  pixels: Uint8ClampedArray;
+  threshold: number;
+  width: number;
+}
+
+const xdogCache = new WeakMap<object, XdogCacheEntry>();
+
+function getCachedXdogPixels(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  threshold: number,
+  readPixels: () => Uint8ClampedArray,
+): Uint8ClampedArray {
+  const cached = xdogCache.get(source as object);
+  if (
+    cached &&
+    cached.width === width &&
+    cached.height === height &&
+    cached.threshold === threshold
+  ) {
+    return cached.pixels;
+  }
+
+  const pixels = createXdogPixels(readPixels(), width, height, threshold);
+  xdogCache.set(source as object, { height, pixels, threshold, width });
+  return pixels;
 }
 
 function createShader(
@@ -231,11 +262,12 @@ function createWebGLRenderer(
       }
       ensureSource(options);
       if (options.mode === "lineArtXdog" || options.mode === "lineArtXdogSobel") {
-        const sourceImage = sourceData.context.getImageData(
-          0,
-          0,
+        const xdogPixels = getCachedXdogPixels(
+          options.source,
           dimensions.width,
           dimensions.height,
+          options.xdogThreshold,
+          () => sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
         );
         processedData.canvas.width = dimensions.width;
         processedData.canvas.height = dimensions.height;
@@ -245,17 +277,11 @@ function createWebGLRenderer(
         );
         processedImage.data.set(
           options.mode === "lineArtXdog"
-            ? createXdogPixels(
-                sourceImage.data,
+            ? xdogPixels
+            : createLineArtPixels(
+                xdogPixels,
                 dimensions.width,
                 dimensions.height,
-                options.xdogThreshold,
-              )
-            : createXdogSobelPixels(
-                sourceImage.data,
-                dimensions.width,
-                dimensions.height,
-                options.xdogThreshold,
                 options.lineThreshold,
               ),
         );
@@ -352,35 +378,33 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
         options.mode === "lineArtXdog" ||
         options.mode === "lineArtXdogSobel"
       ) {
-        const sourceImage = sourceData.context.getImageData(
-          0,
-          0,
-          dimensions.width,
-          dimensions.height,
-        );
         const lineArt = context.createImageData(dimensions.width, dimensions.height);
         lineArt.data.set(
           options.mode === "lineArt"
             ? createLineArtPixels(
-                sourceImage.data,
+                sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
                 dimensions.width,
                 dimensions.height,
                 options.lineThreshold,
               )
-            : options.mode === "lineArtXdog"
-              ? createXdogPixels(
-                  sourceImage.data,
+            : (() => {
+                const xdogPixels = getCachedXdogPixels(
+                  options.source,
                   dimensions.width,
                   dimensions.height,
                   options.xdogThreshold,
-                )
-              : createXdogSobelPixels(
-                  sourceImage.data,
-                  dimensions.width,
-                  dimensions.height,
-                  options.xdogThreshold,
-                  options.lineThreshold,
-                ),
+                  () =>
+                    sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+                );
+                return options.mode === "lineArtXdog"
+                  ? xdogPixels
+                  : createLineArtPixels(
+                      xdogPixels,
+                      dimensions.width,
+                      dimensions.height,
+                      options.lineThreshold,
+                    );
+              })(),
         );
         context.putImageData(lineArt, 0, 0);
         return;
