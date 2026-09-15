@@ -12,7 +12,10 @@ export const imageUiText = {
     title: "プレビュー表示",
     replacement: "色置換",
     lineArt: "線画",
-    thresholdLabel: "線画のしきい値",
+    xdog: "XDoG",
+    xdogSobel: "XDoG→Sobel",
+    sobelThresholdLabel: "Sobelのしきい値",
+    xdogThresholdLabel: "XDoGのしきい値",
     thresholdUnit: "%",
   },
   colorPicker: {

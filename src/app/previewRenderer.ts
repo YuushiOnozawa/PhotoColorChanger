@@ -1,11 +1,11 @@
 import { hexToRgb } from "./color";
 import { replaceSimilarColors } from "./colorReplacement";
 import { fitImageDimensions } from "./imageLoader";
-import { createLineArtPixels } from "./lineArt";
+import { createLineArtPixels, createXdogPixels } from "./lineArt";
 
 export type RgbColor = readonly [number, number, number];
 export type PreviewRendererKind = "webgl2" | "webgl" | "2d";
-export type PreviewMode = "replacement" | "lineArt";
+export type PreviewMode = "replacement" | "lineArt" | "lineArtXdog" | "lineArtXdogSobel";
 
 export interface PreviewRenderOptions {
   source: CanvasImageSource;
@@ -16,6 +16,7 @@ export interface PreviewRenderOptions {
   tolerance: number;
   mode: PreviewMode;
   lineThreshold: number;
+  xdogThreshold: number;
 }
 
 export interface PreviewRenderer {
@@ -100,6 +101,37 @@ function createSourceCanvas(): {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas context is unavailable");
   return { canvas, context };
+}
+
+interface XdogCacheEntry {
+  height: number;
+  pixels: Uint8ClampedArray;
+  threshold: number;
+  width: number;
+}
+
+const xdogCache = new WeakMap<object, XdogCacheEntry>();
+
+function getCachedXdogPixels(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  threshold: number,
+  readPixels: () => Uint8ClampedArray,
+): Uint8ClampedArray {
+  const cached = xdogCache.get(source as object);
+  if (
+    cached &&
+    cached.width === width &&
+    cached.height === height &&
+    cached.threshold === threshold
+  ) {
+    return cached.pixels;
+  }
+
+  const pixels = createXdogPixels(readPixels(), width, height, threshold);
+  xdogCache.set(source as object, { height, pixels, threshold, width });
+  return pixels;
 }
 
 function createShader(
@@ -193,9 +225,11 @@ function createWebGLRenderer(
   gl.uniform1i(imageLocation, 0);
 
   const sourceData = createSourceCanvas();
+  const processedData = createSourceCanvas();
   let source: CanvasImageSource | null = null;
   let sourceWidth = 0;
   let sourceHeight = 0;
+  let textureContent: "source" | "xdog" = "source";
 
   const ensureSource = (options: PreviewRenderOptions) => {
     const dimensions = getPreviewDimensions(options.width, options.height, maxPreviewEdge);
@@ -213,6 +247,7 @@ function createWebGLRenderer(
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceData.canvas);
+      textureContent = "source";
     }
     return dimensions;
   };
@@ -226,6 +261,39 @@ function createWebGLRenderer(
         canvas.height = dimensions.height;
       }
       ensureSource(options);
+      if (options.mode === "lineArtXdog" || options.mode === "lineArtXdogSobel") {
+        const xdogPixels = getCachedXdogPixels(
+          options.source,
+          dimensions.width,
+          dimensions.height,
+          options.xdogThreshold,
+          () => sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+        );
+        processedData.canvas.width = dimensions.width;
+        processedData.canvas.height = dimensions.height;
+        const processedImage = processedData.context.createImageData(
+          dimensions.width,
+          dimensions.height,
+        );
+        processedImage.data.set(
+          options.mode === "lineArtXdog"
+            ? xdogPixels
+            : createLineArtPixels(
+                xdogPixels,
+                dimensions.width,
+                dimensions.height,
+                options.lineThreshold,
+              ),
+        );
+        processedData.context.putImageData(processedImage, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, processedData.canvas);
+        textureContent = "xdog";
+      } else if (textureContent === "xdog") {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceData.canvas);
+        textureContent = "source";
+      }
       gl.viewport(0, 0, dimensions.width, dimensions.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -305,21 +373,38 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
         canvas.height = dimensions.height;
       }
       context.clearRect(0, 0, dimensions.width, dimensions.height);
-      if (options.mode === "lineArt") {
-        const sourceImage = sourceData.context.getImageData(
-          0,
-          0,
-          dimensions.width,
-          dimensions.height,
-        );
+      if (
+        options.mode === "lineArt" ||
+        options.mode === "lineArtXdog" ||
+        options.mode === "lineArtXdogSobel"
+      ) {
         const lineArt = context.createImageData(dimensions.width, dimensions.height);
         lineArt.data.set(
-          createLineArtPixels(
-            sourceImage.data,
-            dimensions.width,
-            dimensions.height,
-            options.lineThreshold,
-          ),
+          options.mode === "lineArt"
+            ? createLineArtPixels(
+                sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+                dimensions.width,
+                dimensions.height,
+                options.lineThreshold,
+              )
+            : (() => {
+                const xdogPixels = getCachedXdogPixels(
+                  options.source,
+                  dimensions.width,
+                  dimensions.height,
+                  options.xdogThreshold,
+                  () =>
+                    sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+                );
+                return options.mode === "lineArtXdog"
+                  ? xdogPixels
+                  : createLineArtPixels(
+                      xdogPixels,
+                      dimensions.width,
+                      dimensions.height,
+                      options.lineThreshold,
+                    );
+              })(),
         );
         context.putImageData(lineArt, 0, 0);
         return;
