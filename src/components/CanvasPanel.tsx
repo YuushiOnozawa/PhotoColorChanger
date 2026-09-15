@@ -1,6 +1,7 @@
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import { hexToRgb, rgbToHex } from "../app/color";
-import type { LoadedImage } from "../app/imageLoader";
+import type { ImagePoint } from "../app/colorReplacement";
+import { fitImageDimensions, type LoadedImage } from "../app/imageLoader";
 import {
   createPreviewRenderer,
   getPreviewMaxEdge,
@@ -16,12 +17,14 @@ interface CanvasPanelProps {
   isLoading: boolean;
   loadedImage: LoadedImage | null;
   notice: string | null;
-  onColorPick: (color: string) => void;
+  onColorPick: (color: string, point: ImagePoint) => void;
   onFileSelect: (file: File | undefined) => void;
   previewMode: PreviewMode;
   replacementColor: string;
   selectedColor: string | null;
+  targetPoint: ImagePoint | null;
   tolerance: number;
+  colorEdgeWeight: number;
   lineThreshold: number;
   xdogThreshold: number;
 }
@@ -37,7 +40,9 @@ function CanvasPanel({
   previewMode,
   replacementColor,
   selectedColor,
+  targetPoint,
   tolerance,
+  colorEdgeWeight,
   lineThreshold,
   xdogThreshold,
 }: CanvasPanelProps) {
@@ -47,6 +52,13 @@ function CanvasPanel({
     const canvas = canvasRef.current;
     if (!canvas || !loadedImage) return;
 
+    const dimensions = fitImageDimensions(
+      loadedImage.width,
+      loadedImage.height,
+      getPreviewMaxEdge(window.innerWidth),
+    );
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     const renderer = createPreviewRenderer(canvas, getPreviewMaxEdge(window.innerWidth));
     rendererRef.current = renderer;
     canvas.dataset.renderer = renderer.kind;
@@ -71,13 +83,17 @@ function CanvasPanel({
       mode: previewMode,
       lineThreshold,
       xdogThreshold,
+      colorEdgeWeight,
+      targetPoint,
     });
   }, [
     loadedImage,
+    colorEdgeWeight,
     lineThreshold,
     previewMode,
     replacementColor,
     selectedColor,
+    targetPoint,
     tolerance,
     xdogThreshold,
   ]);
@@ -96,7 +112,7 @@ function CanvasPanel({
       Math.max(0, Math.floor(((event.clientY - rect.top) / rect.height) * canvas.height)),
     );
     const color = rendererRef.current?.pick(x, y);
-    if (color) onColorPick(rgbToHex(...color));
+    if (color) onColorPick(rgbToHex(...color), [x, y]);
   };
 
   return (

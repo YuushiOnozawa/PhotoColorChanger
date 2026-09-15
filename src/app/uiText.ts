@@ -17,6 +17,8 @@ export const imageUiText = {
     sobelThresholdLabel: "Sobelのしきい値",
     xdogThresholdLabel: "XDoGのしきい値",
     thresholdUnit: "%",
+    colorWeightLabel: "色差の重み",
+    colorWeightUnit: "%",
   },
   colorPicker: {
     title: "色を選択",
