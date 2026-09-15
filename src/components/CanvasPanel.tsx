@@ -26,6 +26,7 @@ interface CanvasPanelProps {
   tolerance: number;
   colorEdgeWeight: number;
   lineThreshold: number;
+  xdogThreshold: number;
 }
 
 function CanvasPanel({
@@ -43,6 +44,7 @@ function CanvasPanel({
   tolerance,
   colorEdgeWeight,
   lineThreshold,
+  xdogThreshold,
 }: CanvasPanelProps) {
   const rendererRef = useRef<PreviewRenderer | null>(null);
 
@@ -80,6 +82,7 @@ function CanvasPanel({
       tolerance,
       mode: previewMode,
       lineThreshold,
+      xdogThreshold,
       colorEdgeWeight,
       targetPoint,
     });
@@ -92,6 +95,7 @@ function CanvasPanel({
     selectedColor,
     targetPoint,
     tolerance,
+    xdogThreshold,
   ]);
 
   const handleCanvasClick = (event: MouseEvent<HTMLCanvasElement>) => {

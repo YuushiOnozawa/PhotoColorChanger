@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLineArtPixels } from "./lineArt";
+import { createLineArtPixels, createXdogPixels } from "./lineArt";
 
 describe("線画抽出", () => {
   it("平坦な画像には線を生成しない", () => {
@@ -40,5 +40,20 @@ describe("線画抽出", () => {
 
     expect(result[(1 * 3 + 1) * 4]).toBe(0);
     expect(withoutColorEdge[(1 * 3 + 1) * 4]).toBe(255);
+  });
+
+  it("XDoGで明暗の境界を線として抽出する", () => {
+    const pixels = new Uint8ClampedArray(3 * 3 * 4);
+    for (let index = 0; index < pixels.length; index += 4) {
+      const isRight = index % (3 * 4) === 8;
+      pixels[index] = isRight ? 255 : 0;
+      pixels[index + 1] = pixels[index];
+      pixels[index + 2] = pixels[index];
+      pixels[index + 3] = 255;
+    }
+
+    const result = createXdogPixels(pixels, 3, 3, 10);
+
+    expect(Array.from(result).some((value, index) => index % 4 !== 3 && value < 128)).toBe(true);
   });
 });

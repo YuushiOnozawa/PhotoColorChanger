@@ -23,6 +23,7 @@ function App() {
   const [tolerance, setTolerance] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
   const [lineThreshold, setLineThreshold] = useState(20);
+  const [xdogThreshold, setXdogThreshold] = useState(20);
   const [colorEdgeWeight, setColorEdgeWeight] = useState(DEFAULT_COLOR_EDGE_WEIGHT);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -41,6 +42,7 @@ function App() {
       setTolerance(0);
       setPreviewMode("replacement");
       setLineThreshold(20);
+      setXdogThreshold(20);
       setColorEdgeWeight(DEFAULT_COLOR_EDGE_WEIGHT);
       setAppState({ imageSessionStatus: "loaded" });
       if (nextImage.wasResized) {
@@ -81,9 +83,11 @@ function App() {
           onToleranceChange={setTolerance}
           onPreviewModeChange={setPreviewMode}
           onLineThresholdChange={setLineThreshold}
+          onXdogThresholdChange={setXdogThreshold}
           onColorEdgeWeightChange={setColorEdgeWeight}
           previewMode={previewMode}
           lineThreshold={lineThreshold}
+          xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
@@ -103,6 +107,7 @@ function App() {
           targetPoint={selectedPoint}
           tolerance={tolerance}
           lineThreshold={lineThreshold}
+          xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}
         />
         <HistoryPanel />

@@ -2,6 +2,46 @@ import type { ChangeEvent } from "react";
 import type { PreviewMode } from "../app/previewRenderer";
 import { imageUiText } from "../app/uiText";
 
+function ThresholdControl({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <label className="shrink-0" htmlFor={id}>
+        {label}
+      </label>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+        <input
+          id={id}
+          className="min-w-0 flex-1"
+          type="range"
+          min="1"
+          max="100"
+          step="1"
+          value={value}
+          onChange={(event) => onChange(Number(event.currentTarget.value))}
+          aria-label={label}
+        />
+        <output
+          aria-label={`${label}の値`}
+          className="w-12 shrink-0 text-right font-mono font-bold"
+        >
+          {value}
+          {imageUiText.preview.thresholdUnit}
+        </output>
+      </div>
+    </div>
+  );
+}
+
 interface ToolsPanelProps {
   errorMessage: string | null;
   isImageLoaded: boolean;
@@ -12,12 +52,14 @@ interface ToolsPanelProps {
   onPreviewModeChange: (mode: PreviewMode) => void;
   onReplacementColorChange: (color: string) => void;
   onToleranceChange: (tolerance: number) => void;
+  onXdogThresholdChange: (threshold: number) => void;
   colorEdgeWeight: number;
   lineThreshold: number;
   previewMode: PreviewMode;
   replacementColor: string;
   selectedColor: string | null;
   tolerance: number;
+  xdogThreshold: number;
 }
 
 function ToolsPanel({
@@ -30,12 +72,14 @@ function ToolsPanel({
   onPreviewModeChange,
   onReplacementColorChange,
   onToleranceChange,
+  onXdogThresholdChange,
   lineThreshold,
   colorEdgeWeight,
   previewMode,
   replacementColor,
   selectedColor,
   tolerance,
+  xdogThreshold,
 }: ToolsPanelProps) {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -76,72 +120,77 @@ function ToolsPanel({
               {imageUiText.preview.title}
             </h3>
             <div
-              className="grid grid-cols-2 gap-2"
+              className="grid grid-cols-4 gap-2"
               role="group"
               aria-label={imageUiText.preview.title}
             >
-              {(["replacement", "lineArt"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={previewMode === mode}
-                  className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
-                  onClick={() => onPreviewModeChange(mode)}
-                >
-                  {mode === "lineArt"
-                    ? imageUiText.preview.lineArt
-                    : imageUiText.preview.replacement}
-                </button>
-              ))}
+              {(["replacement", "lineArt", "lineArtXdog", "lineArtXdogSobel"] as const).map(
+                (mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={previewMode === mode}
+                    className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
+                    onClick={() => onPreviewModeChange(mode)}
+                  >
+                    {mode === "lineArt"
+                      ? imageUiText.preview.lineArt
+                      : mode === "lineArtXdog"
+                        ? imageUiText.preview.xdog
+                        : mode === "lineArtXdogSobel"
+                          ? imageUiText.preview.xdogSobel
+                          : imageUiText.preview.replacement}
+                  </button>
+                ),
+              )}
             </div>
-            {previewMode === "lineArt" && (
+            {previewMode !== "replacement" && (
               <div className="mt-3 grid gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <label htmlFor="line-threshold">{imageUiText.preview.thresholdLabel}</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="line-threshold"
-                      type="range"
-                      min="1"
-                      max="100"
-                      step="1"
-                      value={lineThreshold}
-                      onChange={(event) => onLineThresholdChange(Number(event.currentTarget.value))}
-                      aria-label={imageUiText.preview.thresholdLabel}
-                    />
-                    <output
-                      aria-label={`${imageUiText.preview.thresholdLabel}の値`}
-                      className="font-mono font-bold"
-                    >
-                      {lineThreshold}
-                      {imageUiText.preview.thresholdUnit}
-                    </output>
+                {(previewMode === "lineArtXdog" || previewMode === "lineArtXdogSobel") && (
+                  <ThresholdControl
+                    id="xdog-threshold"
+                    label={imageUiText.preview.xdogThresholdLabel}
+                    value={xdogThreshold}
+                    onChange={onXdogThresholdChange}
+                  />
+                )}
+                {(previewMode === "lineArt" || previewMode === "lineArtXdogSobel") && (
+                  <ThresholdControl
+                    id="line-threshold"
+                    label={imageUiText.preview.sobelThresholdLabel}
+                    value={lineThreshold}
+                    onChange={onLineThresholdChange}
+                  />
+                )}
+                {previewMode === "lineArt" && (
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="shrink-0" htmlFor="color-edge-weight">
+                      {imageUiText.preview.colorWeightLabel}
+                    </label>
+                    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                      <input
+                        id="color-edge-weight"
+                        className="min-w-0 flex-1"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={colorEdgeWeight}
+                        onChange={(event) =>
+                          onColorEdgeWeightChange(Number(event.currentTarget.value))
+                        }
+                        aria-label={imageUiText.preview.colorWeightLabel}
+                      />
+                      <output
+                        aria-label={`${imageUiText.preview.colorWeightLabel}の値`}
+                        className="w-12 shrink-0 text-right font-mono font-bold"
+                      >
+                        {colorEdgeWeight}
+                        {imageUiText.preview.colorWeightUnit}
+                      </output>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <label htmlFor="color-edge-weight">{imageUiText.preview.colorWeightLabel}</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="color-edge-weight"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={colorEdgeWeight}
-                      onChange={(event) =>
-                        onColorEdgeWeightChange(Number(event.currentTarget.value))
-                      }
-                      aria-label={imageUiText.preview.colorWeightLabel}
-                    />
-                    <output
-                      aria-label={`${imageUiText.preview.colorWeightLabel}の値`}
-                      className="font-mono font-bold"
-                    >
-                      {colorEdgeWeight}
-                      {imageUiText.preview.colorWeightUnit}
-                    </output>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </section>
