@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -201,9 +202,14 @@ for (const fixture of ["c15-original.png", "c15-line-art.png"]) {
 }
 
 const exampleDirectory = process.env.PCC_EXAMPLE_DIR ?? resolve("example");
+const exampleFixtures = ["sample1.jpeg", "sample2.jpeg"] as const;
+const hasExampleFixtures = exampleFixtures.every((fixture) =>
+  existsSync(resolve(exampleDirectory, fixture)),
+);
 
-for (const fixture of ["sample1.jpeg", "sample2.jpeg"]) {
+for (const fixture of exampleFixtures) {
   test(`EXAMPLE ${fixture} の線画プレビューを検証する`, async ({ page }) => {
+    test.skip(!hasExampleFixtures, "example画像がないためローカル検証をスキップ");
     await page.goto("/");
     await page.getByLabel("画像ファイル").setInputFiles(resolve(exampleDirectory, fixture));
 

@@ -1,9 +1,14 @@
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const thresholds = [3, 5, 10, 15, 20, 30, 40, 60, 80];
 const exampleDirectory = process.env.PCC_EXAMPLE_DIR ?? resolve("example");
+const exampleFixtures = ["sample1.jpeg", "sample2.jpeg"] as const;
+const hasExampleFixtures = exampleFixtures.every((fixture) =>
+  existsSync(resolve(exampleDirectory, fixture)),
+);
 test.setTimeout(120_000);
 const methods = [
   { key: "sobel", button: "線画", sliders: ["Sobelのしきい値"] },
@@ -66,8 +71,9 @@ async function createContactSheet(page: Page, images: string[]) {
   );
 }
 
-for (const fixture of ["sample1.jpeg", "sample2.jpeg"]) {
+for (const fixture of exampleFixtures) {
   test(`EXAMPLE ${fixture} のしきい値スイープ`, async ({ page }) => {
+    test.skip(!hasExampleFixtures, "example画像がないためローカル検証をスキップ");
     await page.goto("/");
     await page.getByLabel("画像ファイル").setInputFiles(resolve(exampleDirectory, fixture));
     const canvas = page.getByRole("img", { name: `${fixture}の画像` });
