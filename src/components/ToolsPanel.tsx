@@ -15,10 +15,13 @@ function ThresholdControl({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <label htmlFor={id}>{label}</label>
-      <div className="flex items-center gap-2">
+      <label className="shrink-0" htmlFor={id}>
+        {label}
+      </label>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
         <input
           id={id}
+          className="min-w-0 flex-1"
           type="range"
           min="1"
           max="100"
@@ -27,7 +30,10 @@ function ThresholdControl({
           onChange={(event) => onChange(Number(event.currentTarget.value))}
           aria-label={label}
         />
-        <output aria-label={`${label}の値`} className="font-mono font-bold">
+        <output
+          aria-label={`${label}の値`}
+          className="w-12 shrink-0 text-right font-mono font-bold"
+        >
           {value}
           {imageUiText.preview.thresholdUnit}
         </output>
