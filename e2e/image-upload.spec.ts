@@ -202,7 +202,7 @@ for (const fixture of ["c15-original.png", "c15-line-art.png"]) {
 }
 
 const exampleDirectory = process.env.PCC_EXAMPLE_DIR ?? resolve("example");
-const exampleFixtures = ["sample1.jpeg", "sample2.jpeg"] as const;
+const exampleFixtures = ["sample1.png", "sample2.png"] as const;
 const hasExampleFixtures = exampleFixtures.every((fixture) =>
   existsSync(resolve(exampleDirectory, fixture)),
 );

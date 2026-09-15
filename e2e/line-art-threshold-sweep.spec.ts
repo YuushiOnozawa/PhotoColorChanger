@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const thresholds = [3, 5, 10, 15, 20, 30, 40, 60, 80];
 const exampleDirectory = process.env.PCC_EXAMPLE_DIR ?? resolve("example");
-const exampleFixtures = ["sample1.jpeg", "sample2.jpeg"] as const;
+const exampleFixtures = ["sample1.png", "sample2.png"] as const;
 const hasExampleFixtures = exampleFixtures.every((fixture) =>
   existsSync(resolve(exampleDirectory, fixture)),
 );
