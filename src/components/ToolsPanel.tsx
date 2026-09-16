@@ -14,14 +14,12 @@ function ThresholdControl({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <label className="shrink-0" htmlFor={id}>
-        {label}
-      </label>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+    <div className="grid gap-1.5">
+      <label htmlFor={id}>{label}</label>
+      <div className="flex min-w-0 items-center gap-2">
         <input
           id={id}
-          className="min-w-0 flex-1"
+          className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
           type="range"
           min="1"
           max="100"
@@ -123,11 +121,7 @@ function ToolsPanel({
             <h3 id="preview-mode-title" className="mb-3 text-sm">
               {imageUiText.preview.title}
             </h3>
-            <div
-              className="grid grid-cols-5 gap-2"
-              role="group"
-              aria-label={imageUiText.preview.title}
-            >
+            <div className="grid gap-2" role="group" aria-label={imageUiText.preview.title}>
               {(
                 [
                   "replacement",
@@ -141,7 +135,7 @@ function ToolsPanel({
                   key={mode}
                   type="button"
                   aria-pressed={previewMode === mode}
-                  className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
+                  className="w-full rounded-lg border border-[#cdbfad] px-3 py-2 text-center text-sm font-bold whitespace-nowrap transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
                   onClick={() => onPreviewModeChange(mode)}
                 >
                   {mode === "lineArt"
@@ -183,14 +177,14 @@ function ToolsPanel({
                   />
                 )}
                 {previewMode === "lineArt" && (
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="shrink-0" htmlFor="color-edge-weight">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="color-edge-weight">
                       {imageUiText.preview.colorWeightLabel}
                     </label>
-                    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <input
                         id="color-edge-weight"
-                        className="min-w-0 flex-1"
+                        className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
                         type="range"
                         min="0"
                         max="100"
@@ -253,7 +247,7 @@ function ToolsPanel({
                 </dd>
               </div>
               {selectedColor && (
-                <div className="flex items-center justify-between gap-3">
+                <div className="grid gap-1.5">
                   <dt>
                     <label htmlFor="color-tolerance">
                       {imageUiText.colorReplacement.toleranceLabel}
@@ -263,6 +257,7 @@ function ToolsPanel({
                     <input
                       id="color-tolerance"
                       type="range"
+                      className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
                       min="0"
                       max="100"
                       step="1"
