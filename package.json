@@ -16,6 +16,7 @@
     "test:e2e:line-art:docs": "playwright test e2e/image-upload.spec.ts -g DOC",
     "test:e2e:line-art:examples": "playwright test e2e/image-upload.spec.ts -g EXAMPLE",
     "test:e2e:line-art:sweep": "playwright test e2e/line-art-threshold-sweep.spec.ts",
+    "test:e2e:replacement:sweep": "playwright test e2e/color-replacement-method-sweep.spec.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{js,ts,json,html}\" \"README.md\" \".github/**/*.{yml,yaml}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{js,ts,json,html}\" \"README.md\" \".github/**/*.{yml,yaml}\""
   },

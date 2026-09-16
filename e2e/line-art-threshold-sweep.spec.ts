@@ -12,6 +12,7 @@ const hasExampleFixtures = exampleFixtures.every((fixture) =>
 test.setTimeout(120_000);
 const methods = [
   { key: "sobel", button: "線画", sliders: ["Sobelのしきい値"] },
+  { key: "binary", button: "2値化", sliders: ["2値化のしきい値"] },
   { key: "xdog", button: "XDoG", sliders: ["XDoGのしきい値"] },
   {
     key: "xdog-sobel",

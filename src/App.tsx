@@ -2,7 +2,12 @@ import { useRef, useState } from "react";
 import type { ImagePoint } from "./app/colorReplacement";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
-import { DEFAULT_COLOR_EDGE_WEIGHT, DEFAULT_SHADOW_LINE_THRESHOLD } from "./app/lineArt";
+import {
+  DEFAULT_BINARY_THRESHOLD,
+  DEFAULT_COLOR_EDGE_WEIGHT,
+  DEFAULT_SHADOW_LINE_THRESHOLD,
+  type LineArtMethod,
+} from "./app/lineArt";
 import type { PreviewMode } from "./app/previewRenderer";
 import { imageUiText } from "./app/uiText";
 import AppHeader from "./components/AppHeader";
@@ -22,7 +27,9 @@ function App() {
   const [replacementColor, setReplacementColor] = useState("#ffffff");
   const [tolerance, setTolerance] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
+  const [replacementMethod, setReplacementMethod] = useState<LineArtMethod>("sobel");
   const [lineThreshold, setLineThreshold] = useState(20);
+  const [binaryThreshold, setBinaryThreshold] = useState(DEFAULT_BINARY_THRESHOLD);
   const [shadowLineThreshold, setShadowLineThreshold] = useState(DEFAULT_SHADOW_LINE_THRESHOLD);
   const [xdogThreshold, setXdogThreshold] = useState(20);
   const [colorEdgeWeight, setColorEdgeWeight] = useState(DEFAULT_COLOR_EDGE_WEIGHT);
@@ -42,7 +49,9 @@ function App() {
       setSelectedPoint(null);
       setTolerance(0);
       setPreviewMode("replacement");
+      setReplacementMethod("sobel");
       setLineThreshold(20);
+      setBinaryThreshold(DEFAULT_BINARY_THRESHOLD);
       setShadowLineThreshold(DEFAULT_SHADOW_LINE_THRESHOLD);
       setXdogThreshold(20);
       setColorEdgeWeight(DEFAULT_COLOR_EDGE_WEIGHT);
@@ -84,12 +93,16 @@ function App() {
           onReplacementColorChange={setReplacementColor}
           onToleranceChange={setTolerance}
           onPreviewModeChange={setPreviewMode}
+          onReplacementMethodChange={setReplacementMethod}
           onLineThresholdChange={setLineThreshold}
+          onBinaryThresholdChange={setBinaryThreshold}
           onShadowLineThresholdChange={setShadowLineThreshold}
           onXdogThresholdChange={setXdogThreshold}
           onColorEdgeWeightChange={setColorEdgeWeight}
           previewMode={previewMode}
+          replacementMethod={replacementMethod}
           lineThreshold={lineThreshold}
+          binaryThreshold={binaryThreshold}
           shadowLineThreshold={shadowLineThreshold}
           xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}
@@ -106,11 +119,13 @@ function App() {
           onColorPick={handleColorPick}
           onFileSelect={(file) => void handleFile(file)}
           previewMode={previewMode}
+          replacementMethod={replacementMethod}
           replacementColor={replacementColor}
           selectedColor={selectedColor}
           targetPoint={selectedPoint}
           tolerance={tolerance}
           lineThreshold={lineThreshold}
+          binaryThreshold={binaryThreshold}
           shadowLineThreshold={shadowLineThreshold}
           xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}

@@ -35,16 +35,16 @@ async function createPngFile(page: Page, name: string, width: number, height: nu
 async function createSeparatedPngFile(page: Page) {
   const bytes = await page.evaluate(async () => {
     const source = document.createElement("canvas");
-    source.width = 6;
-    source.height = 2;
+    source.width = 120;
+    source.height = 80;
     const context = source.getContext("2d");
     if (!context) throw new Error("Canvas context is unavailable");
 
     context.fillStyle = "#9a5634";
-    context.fillRect(0, 0, 2, 2);
-    context.fillRect(4, 0, 2, 2);
+    context.fillRect(0, 0, 40, 80);
+    context.fillRect(80, 0, 40, 80);
     context.fillStyle = "#000000";
-    context.fillRect(2, 0, 2, 2);
+    context.fillRect(40, 0, 40, 80);
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       source.toBlob((value) => {
@@ -60,6 +60,45 @@ async function createSeparatedPngFile(page: Page) {
     mimeType: "image/png",
     buffer: Buffer.from(bytes),
   };
+}
+
+async function setReplacementColor(page: Page, color: string) {
+  await page.locator("#replacement-color").evaluate((element, nextColor) => {
+    const input = element as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, nextColor);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, color);
+}
+
+async function readCanvasPixel(page: Page, x: number, y: number) {
+  return page.locator("canvas").evaluate(
+    async (element, point) => {
+      const source = element as HTMLCanvasElement;
+      const gl = source.getContext("webgl2") ?? source.getContext("webgl");
+      if (gl) {
+        const pixel = new Uint8Array(4);
+        gl.readPixels(point.x, source.height - point.y - 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        return Array.from(pixel);
+      }
+      const image = new Image();
+      const loaded = new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Canvas screenshot loading failed"));
+      });
+      image.src = source.toDataURL("image/png");
+      await loaded;
+      const canvas = document.createElement("canvas");
+      canvas.width = source.width;
+      canvas.height = source.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas context is unavailable");
+      context.drawImage(image, 0, 0);
+      return Array.from(context.getImageData(point.x, point.y, 1, 1).data);
+    },
+    { x, y },
+  );
 }
 
 async function createEdgePngFile(page: Page) {
@@ -187,7 +226,7 @@ test("C16のクリック地点から連結領域だけを置換する", async ({
   await page.getByLabel("画像ファイル").setInputFiles(await createSeparatedPngFile(page));
 
   const canvas = page.getByRole("img", { name: "connected-region.pngの画像" });
-  await canvas.click({ position: { x: 1, y: 1 } });
+  await canvas.click({ position: { x: 10, y: 40 } });
   await page.locator("#replacement-color").evaluate((element) => {
     const input = element as HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -197,6 +236,46 @@ test("C16のクリック地点から連結領域だけを置換する", async ({
   });
   await expect(page.getByLabel("選択中の置換対象色")).toHaveText("#9a5634");
   await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
+});
+
+test("PR17の各方式で色置換を実行できる", async ({ page }) => {
+  await page.addInitScript(() => {
+    const canvasPrototype = HTMLCanvasElement.prototype as unknown as {
+      getContext: (type: string, options?: unknown) => RenderingContext | null;
+    };
+    const getContext = canvasPrototype.getContext;
+    canvasPrototype.getContext = function (this: HTMLCanvasElement, type, options) {
+      if (type === "webgl2" || type === "webgl") return null;
+      return getContext.call(this, type, options);
+    };
+  });
+  await page.goto("/");
+  await page.getByLabel("画像ファイル").setInputFiles(await createSeparatedPngFile(page));
+
+  const canvas = page.getByRole("img", { name: "connected-region.pngの画像" });
+  await canvas.click({ position: { x: 10, y: 40 } });
+  await setReplacementColor(page, "#336699");
+
+  const methods = [
+    { value: "sobel", key: "sobel" },
+    { value: "binary", key: "binary", slider: "replacement-binary-threshold", threshold: "20" },
+    { value: "shadow", key: "shadow" },
+    { value: "xdog", key: "xdog" },
+    { value: "xdogSobel", key: "xdog-sobel" },
+  ];
+
+  for (const method of methods) {
+    await page.getByLabel("色置換の方式").selectOption(method.value);
+    if (method.slider) {
+      await page.locator(`#${method.slider}`).fill(method.threshold ?? "20");
+    }
+    await expect(page.getByLabel("置換後の色コード")).toHaveText("#336699");
+    await expect(canvas).toHaveScreenshot(`replacement-method-${method.key}.png`, {
+      animations: "disabled",
+    });
+    await expect.poll(() => readCanvasPixel(page, 10, 40)).toEqual([51, 102, 153, 255]);
+    await expect.poll(() => readCanvasPixel(page, 100, 40)).toEqual([154, 86, 52, 255]);
+  }
 });
 
 test("C15の線画プレビュー切替としきい値調整を検証する", async ({ page }) => {
@@ -214,12 +293,21 @@ test("C15の線画プレビュー切替としきい値調整を検証する", as
     "true",
   );
   await expect(canvas).toHaveScreenshot("line-art-c15.png", { animations: "disabled" });
+  await page.getByRole("button", { name: "2値化", exact: true }).click();
+  const binaryThreshold = page.getByRole("slider", { name: "2値化のしきい値" });
+  await expect(binaryThreshold).toHaveValue("50");
+  await expect(page.getByRole("button", { name: "2値化", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(canvas).toHaveScreenshot("line-art-binary-c15.png", { animations: "disabled" });
   await page.getByRole("button", { name: "影補正線画", exact: true }).click();
   const shadowLineThreshold = page.getByRole("slider", { name: "影補正線画のしきい値" });
   await expect(shadowLineThreshold).toHaveValue("20");
-  await expect(
-    page.getByRole("button", { name: "影補正線画", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "影補正線画", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(canvas).toHaveScreenshot("line-art-shadow-c15.png", { animations: "disabled" });
   await page.getByRole("button", { name: "XDoG", exact: true }).click();
   await expect(page.getByRole("button", { name: "XDoG", exact: true })).toHaveAttribute(
@@ -244,7 +332,9 @@ test("C15の線画プレビュー切替としきい値調整を検証する", as
   await colorEdgeWeight.fill("0");
   await expect(colorEdgeWeight).toHaveValue("0");
   await page.getByRole("button", { name: "色置換", exact: true }).click();
-  await expect(lineThreshold).toHaveCount(0);
+  await expect(page.getByLabel("色置換の方式")).toHaveValue("sobel");
+  await expect(page.locator("#replacement-line-threshold")).toHaveValue("80");
+  await expect(lineThreshold).toHaveCount(1);
   await expect(colorEdgeWeight).toHaveCount(0);
 });
 
@@ -276,6 +366,10 @@ for (const fixture of exampleFixtures) {
     await expect(canvas).toBeVisible();
     await page.getByRole("button", { name: "線画", exact: true }).click();
     await expect(canvas).toHaveScreenshot(`example-${fixture}.png`, { animations: "disabled" });
+    await page.getByRole("button", { name: "2値化", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`example-${fixture}-binary.png`, {
+      animations: "disabled",
+    });
     await page.getByRole("button", { name: "影補正線画", exact: true }).click();
     await expect(canvas).toHaveScreenshot(`example-${fixture}-shadow.png`, {
       animations: "disabled",

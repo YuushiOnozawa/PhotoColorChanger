@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  createBinaryEdgeMask,
+  createBinaryPixels,
   createLineArtPixels,
   createShadowNormalizedLineArtPixels,
   createXdogPixels,
@@ -27,6 +29,40 @@ describe("線画抽出", () => {
     const result = createLineArtPixels(pixels, 3, 3, 1);
 
     expect(result[4 * 1 + 0]).toBe(0);
+  });
+
+  it("2値化で平坦な領域を白黒に分ける", () => {
+    const pixels = new Uint8ClampedArray(3 * 3 * 4);
+    for (let index = 0; index < pixels.length; index += 4) {
+      pixels[index] = 200;
+      pixels[index + 1] = 200;
+      pixels[index + 2] = 200;
+      pixels[index + 3] = 255;
+    }
+
+    const result = createBinaryPixels(pixels, 3, 3, 50);
+
+    expect(Array.from(result).every((value, index) => index % 4 === 3 || value === 255)).toBe(true);
+  });
+
+  it("2値化の境界を色置換用のマスクへ変換する", () => {
+    const width = 5;
+    const height = 5;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const value = x < width / 2 ? 0 : 255;
+        const index = (y * width + x) * 4;
+        pixels[index] = value;
+        pixels[index + 1] = value;
+        pixels[index + 2] = value;
+        pixels[index + 3] = 255;
+      }
+    }
+
+    const result = createBinaryEdgeMask(pixels, width, height, 50);
+
+    expect(result[2 * width + 2]).toBe(1);
   });
 
   it("明るさが近い色の境界も線として抽出する", () => {
