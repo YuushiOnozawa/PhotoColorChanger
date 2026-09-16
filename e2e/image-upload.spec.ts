@@ -214,6 +214,13 @@ test("C15の線画プレビュー切替としきい値調整を検証する", as
     "true",
   );
   await expect(canvas).toHaveScreenshot("line-art-c15.png", { animations: "disabled" });
+  await page.getByRole("button", { name: "影補正線画", exact: true }).click();
+  const shadowLineThreshold = page.getByRole("slider", { name: "影補正線画のしきい値" });
+  await expect(shadowLineThreshold).toHaveValue("20");
+  await expect(
+    page.getByRole("button", { name: "影補正線画", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveScreenshot("line-art-shadow-c15.png", { animations: "disabled" });
   await page.getByRole("button", { name: "XDoG", exact: true }).click();
   await expect(page.getByRole("button", { name: "XDoG", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -269,6 +276,10 @@ for (const fixture of exampleFixtures) {
     await expect(canvas).toBeVisible();
     await page.getByRole("button", { name: "線画", exact: true }).click();
     await expect(canvas).toHaveScreenshot(`example-${fixture}.png`, { animations: "disabled" });
+    await page.getByRole("button", { name: "影補正線画", exact: true }).click();
+    await expect(canvas).toHaveScreenshot(`example-${fixture}-shadow.png`, {
+      animations: "disabled",
+    });
     await page.getByRole("button", { name: "XDoG", exact: true }).click();
     await expect(canvas).toHaveScreenshot(`example-${fixture}-xdog.png`, {
       animations: "disabled",

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ImagePoint } from "./app/colorReplacement";
 import { ImageLoadError, loadImageFile, type LoadedImage } from "./app/imageLoader";
 import { initialAppState } from "./app/appState";
-import { DEFAULT_COLOR_EDGE_WEIGHT } from "./app/lineArt";
+import { DEFAULT_COLOR_EDGE_WEIGHT, DEFAULT_SHADOW_LINE_THRESHOLD } from "./app/lineArt";
 import type { PreviewMode } from "./app/previewRenderer";
 import { imageUiText } from "./app/uiText";
 import AppHeader from "./components/AppHeader";
@@ -23,6 +23,7 @@ function App() {
   const [tolerance, setTolerance] = useState(0);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("replacement");
   const [lineThreshold, setLineThreshold] = useState(20);
+  const [shadowLineThreshold, setShadowLineThreshold] = useState(DEFAULT_SHADOW_LINE_THRESHOLD);
   const [xdogThreshold, setXdogThreshold] = useState(20);
   const [colorEdgeWeight, setColorEdgeWeight] = useState(DEFAULT_COLOR_EDGE_WEIGHT);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,6 +43,7 @@ function App() {
       setTolerance(0);
       setPreviewMode("replacement");
       setLineThreshold(20);
+      setShadowLineThreshold(DEFAULT_SHADOW_LINE_THRESHOLD);
       setXdogThreshold(20);
       setColorEdgeWeight(DEFAULT_COLOR_EDGE_WEIGHT);
       setAppState({ imageSessionStatus: "loaded" });
@@ -83,10 +85,12 @@ function App() {
           onToleranceChange={setTolerance}
           onPreviewModeChange={setPreviewMode}
           onLineThresholdChange={setLineThreshold}
+          onShadowLineThresholdChange={setShadowLineThreshold}
           onXdogThresholdChange={setXdogThreshold}
           onColorEdgeWeightChange={setColorEdgeWeight}
           previewMode={previewMode}
           lineThreshold={lineThreshold}
+          shadowLineThreshold={shadowLineThreshold}
           xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}
           replacementColor={replacementColor}
@@ -107,6 +111,7 @@ function App() {
           targetPoint={selectedPoint}
           tolerance={tolerance}
           lineThreshold={lineThreshold}
+          shadowLineThreshold={shadowLineThreshold}
           xdogThreshold={xdogThreshold}
           colorEdgeWeight={colorEdgeWeight}
         />

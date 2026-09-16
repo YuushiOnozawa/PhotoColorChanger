@@ -14,14 +14,12 @@ function ThresholdControl({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <label className="shrink-0" htmlFor={id}>
-        {label}
-      </label>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+    <div className="grid gap-1.5">
+      <label htmlFor={id}>{label}</label>
+      <div className="flex min-w-0 items-center gap-2">
         <input
           id={id}
-          className="min-w-0 flex-1"
+          className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
           type="range"
           min="1"
           max="100"
@@ -49,12 +47,14 @@ interface ToolsPanelProps {
   onFileSelect: (file: File | undefined) => void;
   onColorEdgeWeightChange: (weight: number) => void;
   onLineThresholdChange: (threshold: number) => void;
+  onShadowLineThresholdChange: (threshold: number) => void;
   onPreviewModeChange: (mode: PreviewMode) => void;
   onReplacementColorChange: (color: string) => void;
   onToleranceChange: (tolerance: number) => void;
   onXdogThresholdChange: (threshold: number) => void;
   colorEdgeWeight: number;
   lineThreshold: number;
+  shadowLineThreshold: number;
   previewMode: PreviewMode;
   replacementColor: string;
   selectedColor: string | null;
@@ -69,11 +69,13 @@ function ToolsPanel({
   onFileSelect,
   onColorEdgeWeightChange,
   onLineThresholdChange,
+  onShadowLineThresholdChange,
   onPreviewModeChange,
   onReplacementColorChange,
   onToleranceChange,
   onXdogThresholdChange,
   lineThreshold,
+  shadowLineThreshold,
   colorEdgeWeight,
   previewMode,
   replacementColor,
@@ -119,30 +121,34 @@ function ToolsPanel({
             <h3 id="preview-mode-title" className="mb-3 text-sm">
               {imageUiText.preview.title}
             </h3>
-            <div
-              className="grid grid-cols-4 gap-2"
-              role="group"
-              aria-label={imageUiText.preview.title}
-            >
-              {(["replacement", "lineArt", "lineArtXdog", "lineArtXdogSobel"] as const).map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={previewMode === mode}
-                    className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
-                    onClick={() => onPreviewModeChange(mode)}
-                  >
-                    {mode === "lineArt"
-                      ? imageUiText.preview.lineArt
+            <div className="grid gap-2" role="group" aria-label={imageUiText.preview.title}>
+              {(
+                [
+                  "replacement",
+                  "lineArt",
+                  "lineArtShadow",
+                  "lineArtXdog",
+                  "lineArtXdogSobel",
+                ] as const
+              ).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={previewMode === mode}
+                  className="w-full rounded-lg border border-[#cdbfad] px-3 py-2 text-center text-sm font-bold whitespace-nowrap transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
+                  onClick={() => onPreviewModeChange(mode)}
+                >
+                  {mode === "lineArt"
+                    ? imageUiText.preview.lineArt
+                    : mode === "lineArtShadow"
+                      ? imageUiText.preview.shadowLineArt
                       : mode === "lineArtXdog"
                         ? imageUiText.preview.xdog
                         : mode === "lineArtXdogSobel"
                           ? imageUiText.preview.xdogSobel
                           : imageUiText.preview.replacement}
-                  </button>
-                ),
-              )}
+                </button>
+              ))}
             </div>
             {previewMode !== "replacement" && (
               <div className="mt-3 grid gap-3">
@@ -162,15 +168,23 @@ function ToolsPanel({
                     onChange={onLineThresholdChange}
                   />
                 )}
+                {previewMode === "lineArtShadow" && (
+                  <ThresholdControl
+                    id="shadow-line-threshold"
+                    label={imageUiText.preview.shadowThresholdLabel}
+                    value={shadowLineThreshold}
+                    onChange={onShadowLineThresholdChange}
+                  />
+                )}
                 {previewMode === "lineArt" && (
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="shrink-0" htmlFor="color-edge-weight">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="color-edge-weight">
                       {imageUiText.preview.colorWeightLabel}
                     </label>
-                    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <input
                         id="color-edge-weight"
-                        className="min-w-0 flex-1"
+                        className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
                         type="range"
                         min="0"
                         max="100"
@@ -233,7 +247,7 @@ function ToolsPanel({
                 </dd>
               </div>
               {selectedColor && (
-                <div className="flex items-center justify-between gap-3">
+                <div className="grid gap-1.5">
                   <dt>
                     <label htmlFor="color-tolerance">
                       {imageUiText.colorReplacement.toleranceLabel}
@@ -243,6 +257,7 @@ function ToolsPanel({
                     <input
                       id="color-tolerance"
                       type="range"
+                      className="h-6 min-w-0 w-full flex-1 accent-[#9a5634]"
                       min="0"
                       max="100"
                       step="1"
