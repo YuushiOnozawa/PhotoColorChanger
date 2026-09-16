@@ -49,12 +49,14 @@ interface ToolsPanelProps {
   onFileSelect: (file: File | undefined) => void;
   onColorEdgeWeightChange: (weight: number) => void;
   onLineThresholdChange: (threshold: number) => void;
+  onShadowLineThresholdChange: (threshold: number) => void;
   onPreviewModeChange: (mode: PreviewMode) => void;
   onReplacementColorChange: (color: string) => void;
   onToleranceChange: (tolerance: number) => void;
   onXdogThresholdChange: (threshold: number) => void;
   colorEdgeWeight: number;
   lineThreshold: number;
+  shadowLineThreshold: number;
   previewMode: PreviewMode;
   replacementColor: string;
   selectedColor: string | null;
@@ -69,11 +71,13 @@ function ToolsPanel({
   onFileSelect,
   onColorEdgeWeightChange,
   onLineThresholdChange,
+  onShadowLineThresholdChange,
   onPreviewModeChange,
   onReplacementColorChange,
   onToleranceChange,
   onXdogThresholdChange,
   lineThreshold,
+  shadowLineThreshold,
   colorEdgeWeight,
   previewMode,
   replacementColor,
@@ -120,29 +124,37 @@ function ToolsPanel({
               {imageUiText.preview.title}
             </h3>
             <div
-              className="grid grid-cols-4 gap-2"
+              className="grid grid-cols-5 gap-2"
               role="group"
               aria-label={imageUiText.preview.title}
             >
-              {(["replacement", "lineArt", "lineArtXdog", "lineArtXdogSobel"] as const).map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={previewMode === mode}
-                    className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
-                    onClick={() => onPreviewModeChange(mode)}
-                  >
-                    {mode === "lineArt"
-                      ? imageUiText.preview.lineArt
+              {(
+                [
+                  "replacement",
+                  "lineArt",
+                  "lineArtShadow",
+                  "lineArtXdog",
+                  "lineArtXdogSobel",
+                ] as const
+              ).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={previewMode === mode}
+                  className="rounded-lg border border-[#cdbfad] px-3 py-2 text-sm font-bold transition hover:bg-[#f4e2d5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a5634] aria-pressed:bg-[#9a5634] aria-pressed:text-white"
+                  onClick={() => onPreviewModeChange(mode)}
+                >
+                  {mode === "lineArt"
+                    ? imageUiText.preview.lineArt
+                    : mode === "lineArtShadow"
+                      ? imageUiText.preview.shadowLineArt
                       : mode === "lineArtXdog"
                         ? imageUiText.preview.xdog
                         : mode === "lineArtXdogSobel"
                           ? imageUiText.preview.xdogSobel
                           : imageUiText.preview.replacement}
-                  </button>
-                ),
-              )}
+                </button>
+              ))}
             </div>
             {previewMode !== "replacement" && (
               <div className="mt-3 grid gap-3">
@@ -160,6 +172,14 @@ function ToolsPanel({
                     label={imageUiText.preview.sobelThresholdLabel}
                     value={lineThreshold}
                     onChange={onLineThresholdChange}
+                  />
+                )}
+                {previewMode === "lineArtShadow" && (
+                  <ThresholdControl
+                    id="shadow-line-threshold"
+                    label={imageUiText.preview.shadowThresholdLabel}
+                    value={shadowLineThreshold}
+                    onChange={onShadowLineThresholdChange}
                   />
                 )}
                 {previewMode === "lineArt" && (

@@ -26,6 +26,7 @@ interface CanvasPanelProps {
   tolerance: number;
   colorEdgeWeight: number;
   lineThreshold: number;
+  shadowLineThreshold: number;
   xdogThreshold: number;
 }
 
@@ -44,6 +45,7 @@ function CanvasPanel({
   tolerance,
   colorEdgeWeight,
   lineThreshold,
+  shadowLineThreshold,
   xdogThreshold,
 }: CanvasPanelProps) {
   const rendererRef = useRef<PreviewRenderer | null>(null);
@@ -82,6 +84,7 @@ function CanvasPanel({
       tolerance,
       mode: previewMode,
       lineThreshold,
+      shadowLineThreshold,
       xdogThreshold,
       colorEdgeWeight,
       targetPoint,
@@ -90,6 +93,7 @@ function CanvasPanel({
     loadedImage,
     colorEdgeWeight,
     lineThreshold,
+    shadowLineThreshold,
     previewMode,
     replacementColor,
     selectedColor,

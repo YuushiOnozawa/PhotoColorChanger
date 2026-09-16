@@ -4,7 +4,11 @@ const XDOG_LARGE_GAUSSIAN = [0.128576, 0.231075, 0.280698, 0.231075, 0.128576];
 const XDOG_GAMMA = 0.98;
 const XDOG_PHI = 10;
 const STRONG_EDGE_MULTIPLIER = 2.5;
+// ponytail: Bound the illumination map at 64×64; use a multiscale blur in a worker if quality or speed needs tuning.
+const SHADOW_NORMALIZATION_MAP_SIZE = 64;
+const SHADOW_NORMALIZATION_GAIN = 2;
 export const DEFAULT_COLOR_EDGE_WEIGHT = 50;
+export const DEFAULT_SHADOW_LINE_THRESHOLD = 20;
 
 type Rgb = readonly [number, number, number];
 
@@ -135,6 +139,89 @@ export function createLineArtPixels(
   }
 
   return result;
+}
+
+function createShadowNormalizedPixels(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8ClampedArray {
+  const mapWidth = Math.max(2, Math.min(SHADOW_NORMALIZATION_MAP_SIZE, Math.ceil(width / 16)));
+  const mapHeight = Math.max(2, Math.min(SHADOW_NORMALIZATION_MAP_SIZE, Math.ceil(height / 16)));
+  const mapTotals = new Float64Array(mapWidth * mapHeight);
+  const mapCounts = new Uint32Array(mapWidth * mapHeight);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixelIndex = (y * width + x) * 4;
+      const mapIndex =
+        Math.min(mapHeight - 1, Math.floor((y * mapHeight) / height)) * mapWidth +
+        Math.min(mapWidth - 1, Math.floor((x * mapWidth) / width));
+      mapTotals[mapIndex] +=
+        (pixels[pixelIndex] * 0.299 +
+          pixels[pixelIndex + 1] * 0.587 +
+          pixels[pixelIndex + 2] * 0.114) /
+        255;
+      mapCounts[mapIndex] += 1;
+    }
+  }
+
+  const map = new Float32Array(mapWidth * mapHeight);
+  for (let index = 0; index < map.length; index += 1) {
+    map[index] = mapCounts[index] > 0 ? mapTotals[index] / mapCounts[index] : 0.5;
+  }
+
+  const result = new Uint8ClampedArray(pixels.length);
+  for (let y = 0; y < height; y += 1) {
+    const mapY = (y / Math.max(1, height - 1)) * (mapHeight - 1);
+    const top = Math.floor(mapY);
+    const bottom = Math.min(mapHeight - 1, top + 1);
+    const yWeight = mapY - top;
+    for (let x = 0; x < width; x += 1) {
+      const mapX = (x / Math.max(1, width - 1)) * (mapWidth - 1);
+      const left = Math.floor(mapX);
+      const right = Math.min(mapWidth - 1, left + 1);
+      const xWeight = mapX - left;
+      const topMean =
+        map[top * mapWidth + left] * (1 - xWeight) + map[top * mapWidth + right] * xWeight;
+      const bottomMean =
+        map[bottom * mapWidth + left] * (1 - xWeight) + map[bottom * mapWidth + right] * xWeight;
+      const localMean = topMean * (1 - yWeight) + bottomMean * yWeight;
+      const pixelIndex = (y * width + x) * 4;
+      const sourceLuminance =
+        (pixels[pixelIndex] * 0.299 +
+          pixels[pixelIndex + 1] * 0.587 +
+          pixels[pixelIndex + 2] * 0.114) /
+        255;
+      const normalizedLuminance = clamp(
+        0.5 + (sourceLuminance - localMean) * SHADOW_NORMALIZATION_GAIN,
+        0,
+        1,
+      );
+      const color = Math.round(normalizedLuminance * 255);
+      result[pixelIndex] = color;
+      result[pixelIndex + 1] = color;
+      result[pixelIndex + 2] = color;
+      result[pixelIndex + 3] = pixels[pixelIndex + 3];
+    }
+  }
+
+  return result;
+}
+
+export function createShadowNormalizedLineArtPixels(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold: number,
+): Uint8ClampedArray {
+  return createLineArtPixels(
+    createShadowNormalizedPixels(pixels, width, height),
+    width,
+    height,
+    threshold,
+    0,
+  );
 }
 
 function gaussianBlurredLuminance(
