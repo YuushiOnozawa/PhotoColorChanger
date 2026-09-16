@@ -2,6 +2,7 @@ import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
 import { hexToRgb, rgbToHex } from "../app/color";
 import type { ImagePoint } from "../app/colorReplacement";
 import { fitImageDimensions, type LoadedImage } from "../app/imageLoader";
+import type { LineArtMethod } from "../app/lineArt";
 import {
   createPreviewRenderer,
   getPreviewMaxEdge,
@@ -20,12 +21,14 @@ interface CanvasPanelProps {
   onColorPick: (color: string, point: ImagePoint) => void;
   onFileSelect: (file: File | undefined) => void;
   previewMode: PreviewMode;
+  replacementMethod: LineArtMethod;
   replacementColor: string;
   selectedColor: string | null;
   targetPoint: ImagePoint | null;
   tolerance: number;
   colorEdgeWeight: number;
   lineThreshold: number;
+  binaryThreshold: number;
   shadowLineThreshold: number;
   xdogThreshold: number;
 }
@@ -39,12 +42,14 @@ function CanvasPanel({
   onColorPick,
   onFileSelect,
   previewMode,
+  replacementMethod,
   replacementColor,
   selectedColor,
   targetPoint,
   tolerance,
   colorEdgeWeight,
   lineThreshold,
+  binaryThreshold,
   shadowLineThreshold,
   xdogThreshold,
 }: CanvasPanelProps) {
@@ -83,7 +88,9 @@ function CanvasPanel({
       replacementColor: replacementColorFromHex(replacementColor),
       tolerance,
       mode: previewMode,
+      replacementMethod,
       lineThreshold,
+      binaryThreshold,
       shadowLineThreshold,
       xdogThreshold,
       colorEdgeWeight,
@@ -92,9 +99,11 @@ function CanvasPanel({
   }, [
     loadedImage,
     colorEdgeWeight,
+    binaryThreshold,
     lineThreshold,
     shadowLineThreshold,
     previewMode,
+    replacementMethod,
     replacementColor,
     selectedColor,
     targetPoint,

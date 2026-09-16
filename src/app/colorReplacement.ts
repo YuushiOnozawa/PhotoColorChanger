@@ -41,6 +41,7 @@ export function createConnectedRegionMask(
   tolerance: number,
   lineThreshold: number,
   colorEdgeWeight = DEFAULT_COLOR_EDGE_WEIGHT,
+  lineMask = createLineArtMask(pixels, width, height, lineThreshold, colorEdgeWeight),
 ): Uint8Array {
   const regionMask = new Uint8Array(width * height);
   if (width === 0 || height === 0) return regionMask;
@@ -53,7 +54,6 @@ export function createConnectedRegionMask(
 
   const normalizedTolerance = Math.max(0, Math.min(100, tolerance)) / 100;
   const maxDistanceSquared = normalizedTolerance ** 2 * MAX_DISTANCE_SQUARED;
-  const lineMask = createLineArtMask(pixels, width, height, lineThreshold, colorEdgeWeight);
   const queue = new Int32Array(width * height);
   let queueStart = 0;
   let queueEnd = 0;

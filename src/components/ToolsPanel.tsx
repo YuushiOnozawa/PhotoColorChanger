@@ -1,4 +1,5 @@
 import type { ChangeEvent } from "react";
+import type { LineArtMethod } from "../app/lineArt";
 import type { PreviewMode } from "../app/previewRenderer";
 import { imageUiText } from "../app/uiText";
 
@@ -47,15 +48,19 @@ interface ToolsPanelProps {
   onFileSelect: (file: File | undefined) => void;
   onColorEdgeWeightChange: (weight: number) => void;
   onLineThresholdChange: (threshold: number) => void;
+  onBinaryThresholdChange: (threshold: number) => void;
   onShadowLineThresholdChange: (threshold: number) => void;
   onPreviewModeChange: (mode: PreviewMode) => void;
+  onReplacementMethodChange: (method: LineArtMethod) => void;
   onReplacementColorChange: (color: string) => void;
   onToleranceChange: (tolerance: number) => void;
   onXdogThresholdChange: (threshold: number) => void;
   colorEdgeWeight: number;
   lineThreshold: number;
+  binaryThreshold: number;
   shadowLineThreshold: number;
   previewMode: PreviewMode;
+  replacementMethod: LineArtMethod;
   replacementColor: string;
   selectedColor: string | null;
   tolerance: number;
@@ -69,15 +74,19 @@ function ToolsPanel({
   onFileSelect,
   onColorEdgeWeightChange,
   onLineThresholdChange,
+  onBinaryThresholdChange,
   onShadowLineThresholdChange,
   onPreviewModeChange,
+  onReplacementMethodChange,
   onReplacementColorChange,
   onToleranceChange,
   onXdogThresholdChange,
   lineThreshold,
+  binaryThreshold,
   shadowLineThreshold,
   colorEdgeWeight,
   previewMode,
+  replacementMethod,
   replacementColor,
   selectedColor,
   tolerance,
@@ -126,6 +135,7 @@ function ToolsPanel({
                 [
                   "replacement",
                   "lineArt",
+                  "lineArtBinary",
                   "lineArtShadow",
                   "lineArtXdog",
                   "lineArtXdogSobel",
@@ -140,16 +150,84 @@ function ToolsPanel({
                 >
                   {mode === "lineArt"
                     ? imageUiText.preview.lineArt
-                    : mode === "lineArtShadow"
-                      ? imageUiText.preview.shadowLineArt
-                      : mode === "lineArtXdog"
-                        ? imageUiText.preview.xdog
-                        : mode === "lineArtXdogSobel"
-                          ? imageUiText.preview.xdogSobel
-                          : imageUiText.preview.replacement}
+                    : mode === "lineArtBinary"
+                      ? imageUiText.preview.binary
+                      : mode === "lineArtShadow"
+                        ? imageUiText.preview.shadowLineArt
+                        : mode === "lineArtXdog"
+                          ? imageUiText.preview.xdog
+                          : mode === "lineArtXdogSobel"
+                            ? imageUiText.preview.xdogSobel
+                            : imageUiText.preview.replacement}
                 </button>
               ))}
             </div>
+            {previewMode === "replacement" && (
+              <div className="mt-3 grid gap-2">
+                <label htmlFor="replacement-method">
+                  {imageUiText.preview.replacementMethodLabel}
+                </label>
+                <select
+                  id="replacement-method"
+                  value={replacementMethod}
+                  onChange={(event) =>
+                    onReplacementMethodChange(event.currentTarget.value as LineArtMethod)
+                  }
+                  aria-label={imageUiText.preview.replacementMethodLabel}
+                  className="rounded-lg border border-[#cdbfad] bg-white px-3 py-2 text-sm"
+                >
+                  <option value="sobel">{imageUiText.preview.replacementMethods.sobel}</option>
+                  <option value="binary">{imageUiText.preview.replacementMethods.binary}</option>
+                  <option value="shadow">{imageUiText.preview.replacementMethods.shadow}</option>
+                  <option value="xdog">{imageUiText.preview.replacementMethods.xdog}</option>
+                  <option value="xdogSobel">
+                    {imageUiText.preview.replacementMethods.xdogSobel}
+                  </option>
+                </select>
+                <div className="grid gap-3">
+                  {replacementMethod === "sobel" && (
+                    <ThresholdControl
+                      id="replacement-line-threshold"
+                      label={imageUiText.preview.sobelThresholdLabel}
+                      value={lineThreshold}
+                      onChange={onLineThresholdChange}
+                    />
+                  )}
+                  {replacementMethod === "binary" && (
+                    <ThresholdControl
+                      id="replacement-binary-threshold"
+                      label={imageUiText.preview.binaryThresholdLabel}
+                      value={binaryThreshold}
+                      onChange={onBinaryThresholdChange}
+                    />
+                  )}
+                  {replacementMethod === "shadow" && (
+                    <ThresholdControl
+                      id="replacement-shadow-threshold"
+                      label={imageUiText.preview.shadowThresholdLabel}
+                      value={shadowLineThreshold}
+                      onChange={onShadowLineThresholdChange}
+                    />
+                  )}
+                  {(replacementMethod === "xdog" || replacementMethod === "xdogSobel") && (
+                    <ThresholdControl
+                      id="replacement-xdog-threshold"
+                      label={imageUiText.preview.xdogThresholdLabel}
+                      value={xdogThreshold}
+                      onChange={onXdogThresholdChange}
+                    />
+                  )}
+                  {replacementMethod === "xdogSobel" && (
+                    <ThresholdControl
+                      id="replacement-xdog-sobel-threshold"
+                      label={imageUiText.preview.sobelThresholdLabel}
+                      value={lineThreshold}
+                      onChange={onLineThresholdChange}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
             {previewMode !== "replacement" && (
               <div className="mt-3 grid gap-3">
                 {(previewMode === "lineArtXdog" || previewMode === "lineArtXdogSobel") && (
@@ -166,6 +244,14 @@ function ToolsPanel({
                     label={imageUiText.preview.sobelThresholdLabel}
                     value={lineThreshold}
                     onChange={onLineThresholdChange}
+                  />
+                )}
+                {previewMode === "lineArtBinary" && (
+                  <ThresholdControl
+                    id="binary-threshold"
+                    label={imageUiText.preview.binaryThresholdLabel}
+                    value={binaryThreshold}
+                    onChange={onBinaryThresholdChange}
                   />
                 )}
                 {previewMode === "lineArtShadow" && (

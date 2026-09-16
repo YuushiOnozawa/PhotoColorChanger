@@ -7,14 +7,22 @@ import {
 import { fitImageDimensions } from "./imageLoader";
 import {
   createLineArtPixels,
+  createBinaryPixels,
+  createLineArtMaskForMethod,
   createShadowNormalizedLineArtPixels,
   createXdogPixels,
+  type LineArtMethod,
 } from "./lineArt";
 
 export type RgbColor = readonly [number, number, number];
 export type PreviewRendererKind = "webgl2" | "webgl" | "2d";
 export type PreviewMode =
-  "replacement" | "lineArt" | "lineArtShadow" | "lineArtXdog" | "lineArtXdogSobel";
+  | "replacement"
+  | "lineArt"
+  | "lineArtBinary"
+  | "lineArtShadow"
+  | "lineArtXdog"
+  | "lineArtXdogSobel";
 
 export interface PreviewRenderOptions {
   source: CanvasImageSource;
@@ -24,7 +32,9 @@ export interface PreviewRenderOptions {
   replacementColor: RgbColor;
   tolerance: number;
   mode: PreviewMode;
+  replacementMethod: LineArtMethod;
   lineThreshold: number;
+  binaryThreshold: number;
   shadowLineThreshold: number;
   xdogThreshold: number;
   colorEdgeWeight: number;
@@ -377,7 +387,11 @@ function createWebGLRenderer(
       ...options.targetPoint,
       ...options.targetColor,
       options.tolerance,
+      options.replacementMethod,
       options.lineThreshold,
+      options.binaryThreshold,
+      options.shadowLineThreshold,
+      options.xdogThreshold,
       options.colorEdgeWeight,
     ].join(":");
     if (key !== regionMaskKey) {
@@ -386,6 +400,13 @@ function createWebGLRenderer(
         0,
         dimensions.width,
         dimensions.height,
+      );
+      const lineMask = createLineArtMaskForMethod(
+        sourceImage.data,
+        dimensions.width,
+        dimensions.height,
+        options.replacementMethod,
+        options,
       );
       const regionMask = createConnectedRegionMask(
         sourceImage.data,
@@ -396,6 +417,7 @@ function createWebGLRenderer(
         options.tolerance,
         options.lineThreshold,
         options.colorEdgeWeight,
+        lineMask,
       );
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, regionMaskTexture);
@@ -441,6 +463,24 @@ function createWebGLRenderer(
           dimensions.height,
         );
         processedImage.data.set(shadowNormalizedLineArtPixels);
+        processedData.context.putImageData(processedImage, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, processedData.canvas);
+        textureContent = "processed";
+      } else if (options.mode === "lineArtBinary") {
+        const binaryPixels = createBinaryPixels(
+          sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+          dimensions.width,
+          dimensions.height,
+          options.binaryThreshold,
+        );
+        processedData.canvas.width = dimensions.width;
+        processedData.canvas.height = dimensions.height;
+        const processedImage = processedData.context.createImageData(
+          dimensions.width,
+          dimensions.height,
+        );
+        processedImage.data.set(binaryPixels);
         processedData.context.putImageData(processedImage, 0, 0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, processedData.canvas);
@@ -571,6 +611,7 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
       context.clearRect(0, 0, dimensions.width, dimensions.height);
       if (
         options.mode === "lineArt" ||
+        options.mode === "lineArtBinary" ||
         options.mode === "lineArtShadow" ||
         options.mode === "lineArtXdog" ||
         options.mode === "lineArtXdogSobel"
@@ -591,30 +632,37 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
                 options.lineThreshold,
                 options.colorEdgeWeight,
               )
-            : options.mode === "lineArtShadow"
-              ? createShadowNormalizedLineArtPixels(
+            : options.mode === "lineArtBinary"
+              ? createBinaryPixels(
                   sourcePixels,
                   dimensions.width,
                   dimensions.height,
-                  options.shadowLineThreshold,
+                  options.binaryThreshold,
                 )
-              : (() => {
-                  const xdogPixels = getCachedXdogPixels(
-                    options.source,
+              : options.mode === "lineArtShadow"
+                ? createShadowNormalizedLineArtPixels(
+                    sourcePixels,
                     dimensions.width,
                     dimensions.height,
-                    options.xdogThreshold,
-                    () => sourcePixels,
-                  );
-                  return options.mode === "lineArtXdog"
-                    ? xdogPixels
-                    : createLineArtPixels(
-                        xdogPixels,
-                        dimensions.width,
-                        dimensions.height,
-                        options.lineThreshold,
-                      );
-                })(),
+                    options.shadowLineThreshold,
+                  )
+                : (() => {
+                    const xdogPixels = getCachedXdogPixels(
+                      options.source,
+                      dimensions.width,
+                      dimensions.height,
+                      options.xdogThreshold,
+                      () => sourcePixels,
+                    );
+                    return options.mode === "lineArtXdog"
+                      ? xdogPixels
+                      : createLineArtPixels(
+                          xdogPixels,
+                          dimensions.width,
+                          dimensions.height,
+                          options.lineThreshold,
+                        );
+                  })(),
         );
         context.putImageData(lineArt, 0, 0);
         return;
@@ -633,6 +681,13 @@ function create2DRenderer(canvas: HTMLCanvasElement, maxPreviewEdge: number): Pr
             options.tolerance,
             options.lineThreshold,
             options.colorEdgeWeight,
+            createLineArtMaskForMethod(
+              sourceData.context.getImageData(0, 0, dimensions.width, dimensions.height).data,
+              dimensions.width,
+              dimensions.height,
+              options.replacementMethod,
+              options,
+            ),
           )
         : undefined;
       imageData.data.set(

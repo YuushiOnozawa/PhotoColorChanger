@@ -9,6 +9,17 @@ const SHADOW_NORMALIZATION_MAP_SIZE = 64;
 const SHADOW_NORMALIZATION_GAIN = 2;
 export const DEFAULT_COLOR_EDGE_WEIGHT = 50;
 export const DEFAULT_SHADOW_LINE_THRESHOLD = 20;
+export const DEFAULT_BINARY_THRESHOLD = 50;
+
+export type LineArtMethod = "sobel" | "binary" | "shadow" | "xdog" | "xdogSobel";
+
+export interface LineArtMethodOptions {
+  binaryThreshold: number;
+  colorEdgeWeight: number;
+  lineThreshold: number;
+  shadowLineThreshold: number;
+  xdogThreshold: number;
+}
 
 type Rgb = readonly [number, number, number];
 
@@ -135,6 +146,75 @@ export function createLineArtPixels(
       result[index + 1] = color;
       result[index + 2] = color;
       result[index + 3] = pixels[index + 3];
+    }
+  }
+
+  return result;
+}
+
+// ponytail: Use one fixed 5×5 box blur for the comparison; use a separable blur or worker if it becomes a shipped default.
+function averagedLuminance(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+): number {
+  let total = 0;
+  for (let offsetY = -2; offsetY <= 2; offsetY += 1) {
+    for (let offsetX = -2; offsetX <= 2; offsetX += 1) {
+      const safeX = clamp(x + offsetX, 0, width - 1);
+      const safeY = clamp(y + offsetY, 0, height - 1);
+      const index = (safeY * width + safeX) * 4;
+      total +=
+        (pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114) / 255;
+    }
+  }
+  return total / 25;
+}
+
+export function createBinaryPixels(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold: number,
+): Uint8ClampedArray {
+  const result = new Uint8ClampedArray(width * height * 4);
+  const normalizedThreshold = clamp(threshold, 0, 100) / 100;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const color = averagedLuminance(pixels, width, height, x, y) >= normalizedThreshold ? 255 : 0;
+      result[index] = color;
+      result[index + 1] = color;
+      result[index + 2] = color;
+      result[index + 3] = pixels[index + 3];
+    }
+  }
+
+  return result;
+}
+
+export function createBinaryEdgeMask(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold: number,
+): Uint8Array {
+  const binary = createBinaryPixels(pixels, width, height, threshold);
+  const result = new Uint8Array(width * height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const current = binary[index * 4] < 128;
+      const differs =
+        (x > 0 && binary[(index - 1) * 4] < 128 !== current) ||
+        (x + 1 < width && binary[(index + 1) * 4] < 128 !== current) ||
+        (y > 0 && binary[(index - width) * 4] < 128 !== current) ||
+        (y + 1 < height && binary[(index + width) * 4] < 128 !== current);
+      if (differs) result[index] = 1;
     }
   }
 
@@ -300,4 +380,49 @@ export function createXdogSobelPixels(
     height,
     sobelThreshold,
   );
+}
+
+export function createLineArtMaskForMethod(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  method: LineArtMethod,
+  options: LineArtMethodOptions,
+): Uint8Array {
+  switch (method) {
+    case "binary":
+      return createBinaryEdgeMask(pixels, width, height, options.binaryThreshold);
+    case "shadow":
+      return createLineArtMask(
+        createShadowNormalizedPixels(pixels, width, height),
+        width,
+        height,
+        options.shadowLineThreshold,
+        0,
+      );
+    case "xdog":
+      return createLineArtMask(
+        createXdogPixels(pixels, width, height, options.xdogThreshold),
+        width,
+        height,
+        1,
+        0,
+      );
+    case "xdogSobel":
+      return createLineArtMask(
+        createXdogPixels(pixels, width, height, options.xdogThreshold),
+        width,
+        height,
+        options.lineThreshold,
+        0,
+      );
+    case "sobel":
+      return createLineArtMask(
+        pixels,
+        width,
+        height,
+        options.lineThreshold,
+        options.colorEdgeWeight,
+      );
+  }
 }
