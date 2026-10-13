@@ -1,6 +1,11 @@
 import { createBoundaryConstrainedMask } from "./boundaryMethods";
 import { createHsvMask, createLabMask, getSeedMedianRgb, recolorRgb } from "./colorMethods";
-import { recolorHsvHue, recolorLabLuma, recolorSolid } from "./recolorMethods";
+import {
+  recolorHsvHue,
+  recolorLabLuma,
+  recolorLumaColorize,
+  recolorSolid,
+} from "./recolorMethods";
 import type { ImageLike, ImagePoint, MethodId, RgbColor } from "./types";
 
 export type ProcessOptions = {
@@ -19,8 +24,14 @@ export function processComparisonMethod({
   replacement,
   tolerance,
   fixedMask,
-}: ProcessOptions): ImageLike {
+}: ProcessOptions): ImageLike | Promise<ImageLike> {
   if (methodId === "color-rgb") return recolorRgb(image, seed, replacement, tolerance);
+
+  if (methodId === "mask-grabcut") {
+    return import("./grabcutMethod").then(({ processGrabCut }) =>
+      processGrabCut(image, seed, tolerance, replacement),
+    );
+  }
 
   if (methodId === "color-hsv") {
     return recolorSolid(image, createHsvMask(image, seed, tolerance), replacement);
@@ -42,6 +53,7 @@ export function processComparisonMethod({
 
   const mask = fixedMask ?? createHsvMask(image, seed, tolerance);
   if (methodId === "recolor-lab-luma") return recolorLabLuma(image, mask, replacement);
+  if (methodId === "recolor-luma-colorize") return recolorLumaColorize(image, mask, replacement);
   if (methodId === "recolor-hsv-hue") {
     return recolorHsvHue(image, mask, getSeedMedianRgb(image, seed), replacement);
   }

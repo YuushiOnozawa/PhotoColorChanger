@@ -10,11 +10,13 @@
 | 色判定 | RGB | Pages確認済 | 1 | |
 | 色判定 | HSV | Pages確認済 | 1 | |
 | 色判定 | Lab ΔE | Pages確認済 | 1 | |
-| 境界制約 | なし | Pages確認済 | 1 | |
-| 境界制約 | XDoG→Sobel＋連結領域 | Pages確認済 | 1 | |
+| 範囲判定 | なし | Pages確認済 | 1 | |
+| 範囲判定 | XDoG→Sobel＋連結領域 | Pages確認済 | 1 | |
+| 範囲判定 | GrabCut（HSV初期化） | ローカル確認済 | 1 | 型検査・lint・テスト・build済、Pages未確認 |
 | 再着色 | 単色置換 | Pages確認済 | 1 | |
 | 再着色 | Lab L*保持 | Pages確認済 | 1 | |
 | 再着色 | HSV色相シフト | Pages確認済 | 1 | |
+| 再着色 | 陰影保持カラー化（Lab） | ローカル確認済 | 1 | 型検査・lint・テスト・build済、Pages未確認 |
 
 ## チェックポイント
 

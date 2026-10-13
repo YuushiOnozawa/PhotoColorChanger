@@ -14,9 +14,11 @@ export type MethodId =
   | "color-lab"
   | "boundary-none"
   | "boundary-xdog-sobel"
+  | "mask-grabcut"
   | "recolor-solid"
   | "recolor-lab-luma"
-  | "recolor-hsv-hue";
+  | "recolor-hsv-hue"
+  | "recolor-luma-colorize";
 
 export type ComparisonMethod = {
   id: MethodId;

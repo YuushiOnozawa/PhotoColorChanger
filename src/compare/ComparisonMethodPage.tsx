@@ -78,6 +78,7 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const [imageName, setImageName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [exampleSamples, setExampleSamples] = useState<ExampleSample[]>([]);
   const exampleInputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
   const exampleOutputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
@@ -88,54 +89,68 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   }, [method.defaultTolerance, method.id]);
 
   useEffect(() => {
-    if (!image || !inputCanvasRef.current || !outputCanvasRef.current) return;
-    drawImage(inputCanvasRef.current, image);
-    const result = processComparisonMethod({
-      image,
-      methodId: method.id,
-      seed,
-      replacement: colorFromHex(replacementColor),
-      tolerance,
-      fixedMask: groundTruthMask,
-    });
-    drawImage(outputCanvasRef.current, result);
-  }, [groundTruthMask, image, method.id, replacementColor, seed, tolerance]);
+    let stale = false;
+    const processImages = async () => {
+      setIsProcessing(false);
+      if (!image && exampleSamples.length === 0) return;
 
-  useEffect(() => {
-    if (exampleSamples.length === 0) return;
+      setError(null);
+      setIsProcessing(method.id === "mask-grabcut");
+      const replacement = colorFromHex(replacementColor);
+      if (image && inputCanvasRef.current && outputCanvasRef.current) {
+        drawImage(inputCanvasRef.current, image);
+        const output = outputCanvasRef.current;
+        output.getContext("2d")?.clearRect(0, 0, output.width, output.height);
+        const result = await processComparisonMethod({
+          image,
+          methodId: method.id,
+          seed,
+          replacement,
+          tolerance,
+          fixedMask: groundTruthMask,
+        });
+        if (stale) return;
+        drawImage(output, result);
+      }
 
-    let sampleIndex = 0;
-    let timer: number | undefined;
-    const processNextSample = () => {
-      const sample = exampleSamples[sampleIndex];
-      if (!sample) return;
-      sampleIndex += 1;
+      for (const sample of exampleSamples) {
+        if (stale) return;
+        const inputCanvas = exampleInputCanvasRefs.current[sample.name];
+        const outputCanvas = exampleOutputCanvasRefs.current[sample.name];
+        if (!inputCanvas || !outputCanvas) continue;
 
-      const inputCanvas = exampleInputCanvasRefs.current[sample.name];
-      const outputCanvas = exampleOutputCanvasRefs.current[sample.name];
-      if (inputCanvas && outputCanvas) {
         drawImage(inputCanvas, sample.image, EXAMPLE_CANVAS_MAX_EDGE);
-        const result = processComparisonMethod({
+        outputCanvas.getContext("2d")?.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        const result = await processComparisonMethod({
           image: sample.image,
           methodId: method.id,
           seed: sample.seed,
-          replacement: colorFromHex(replacementColor),
+          replacement,
           tolerance,
           fixedMask: null,
         });
+        if (stale) return;
         drawImage(outputCanvas, result, EXAMPLE_CANVAS_MAX_EDGE);
       }
-
-      if (sampleIndex < exampleSamples.length) {
-        timer = window.setTimeout(processNextSample, 0);
-      }
     };
 
-    timer = window.setTimeout(processNextSample, 0);
+    void processImages()
+      .catch(() => {
+        if (stale) return;
+        setError(
+          method.id === "mask-grabcut"
+            ? "OpenCVの読み込みまたはGrabCut処理に失敗しました。"
+            : "画像を処理できませんでした。",
+        );
+      })
+      .finally(() => {
+        if (!stale) setIsProcessing(false);
+      });
+
     return () => {
-      if (timer !== undefined) window.clearTimeout(timer);
+      stale = true;
     };
-  }, [exampleSamples, method.id, replacementColor, tolerance]);
+  }, [exampleSamples, groundTruthMask, image, method.id, replacementColor, seed, tolerance]);
 
   const loadSynthetic = () => {
     const synthetic = createSyntheticImage();
@@ -361,6 +376,11 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
         {error && (
           <p className="mt-4 text-sm font-semibold text-red-700" role="alert">
             {error}
+          </p>
+        )}
+        {isProcessing && method.id === "mask-grabcut" && (
+          <p className="mt-4 text-sm text-[#6e675e]" role="status">
+            OpenCV読み込み中…
           </p>
         )}
         {imageName && <p className="mt-3 text-sm text-[#6e675e]">読み込み中の画像: {imageName}</p>}

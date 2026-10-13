@@ -7,7 +7,7 @@ export const METHODS: readonly ComparisonMethod[] = [
     axisTitle: "色判定",
     title: "RGB距離（現行）",
     description: "クリック位置の基準色とのRGBユークリッド距離で全画素を判定し、単色に置き換えます。",
-    params: ["色判定: RGBユークリッド距離", "境界制約: なし", "再着色: 単色置換"],
+    params: ["色判定: RGBユークリッド距離", "範囲判定: なし", "再着色: 単色置換"],
     defaultTolerance: 12,
     toleranceMax: 100,
     toleranceUnit: "%",
@@ -18,7 +18,7 @@ export const METHODS: readonly ComparisonMethod[] = [
     axisTitle: "色判定",
     title: "HSV距離",
     description: "色相の円環距離と彩度・明度の正規化距離で全画素を判定します。",
-    params: ["色判定: 円環H＋正規化S/Vのユークリッド距離", "境界制約: なし", "再着色: 単色置換"],
+    params: ["色判定: 円環H＋正規化S/Vのユークリッド距離", "範囲判定: なし", "再着色: 単色置換"],
     defaultTolerance: 12,
     toleranceMax: 100,
     toleranceUnit: "%",
@@ -32,7 +32,7 @@ export const METHODS: readonly ComparisonMethod[] = [
     params: [
       "色判定: √((0.35ΔL*)²＋Δa*²＋Δb*²)",
       "許容差スケール: CIELABのL*・a*・b*座標単位",
-      "境界制約: なし",
+      "範囲判定: なし",
       "再着色: 単色置換",
     ],
     defaultTolerance: 10,
@@ -42,10 +42,10 @@ export const METHODS: readonly ComparisonMethod[] = [
   {
     id: "boundary-none",
     axis: "boundary",
-    axisTitle: "境界制約",
-    title: "境界制約なし",
+    axisTitle: "範囲判定",
+    title: "範囲判定なし",
     description: "HSVマスクに含まれる画素を画像全体から選びます。",
-    params: ["色判定: HSV距離", "境界制約: なし", "再着色: 単色置換"],
+    params: ["色判定: HSV距離", "範囲判定: なし", "再着色: 単色置換"],
     defaultTolerance: 12,
     toleranceMax: 100,
     toleranceUnit: "%",
@@ -53,10 +53,27 @@ export const METHODS: readonly ComparisonMethod[] = [
   {
     id: "boundary-xdog-sobel",
     axis: "boundary",
-    axisTitle: "境界制約",
+    axisTitle: "範囲判定",
     title: "XDoG→Sobel＋連結領域",
     description: "HSVマスクをクリック位置からの連結領域に絞り、XDoG→Sobel線を境界に使います。",
-    params: ["色判定: HSV距離", "境界制約: XDoG閾値20・Sobel閾値20", "再着色: 単色置換"],
+    params: ["色判定: HSV距離", "範囲判定: XDoG閾値20・Sobel閾値20", "再着色: 単色置換"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "mask-grabcut",
+    axis: "boundary",
+    axisTitle: "範囲判定",
+    title: "GrabCut（HSV初期化）",
+    description: "HSV候補とクリック近傍から初期マスクを作り、GrabCutで範囲を推定します。",
+    params: [
+      "色判定: HSV距離",
+      "範囲判定: GrabCut（GC_INIT_WITH_MASK）",
+      "再着色: 単色置換",
+      "GrabCut反復回数: 4",
+      "初期化: クリック近傍4px=確定前景、seed接続HSV候補=推定前景、その他=推定背景、画像端=確定背景",
+    ],
     defaultTolerance: 12,
     toleranceMax: 100,
     toleranceUnit: "%",
@@ -94,6 +111,22 @@ export const METHODS: readonly ComparisonMethod[] = [
     toleranceMax: 100,
     toleranceUnit: "%",
   },
+  {
+    id: "recolor-luma-colorize",
+    axis: "recolor",
+    axisTitle: "再着色",
+    title: "陰影保持カラー化（Lab）",
+    description: "共通マスク内の平均L*を置換色のL*へ移し、置換色のa*・b*を適用します。",
+    params: [
+      "色判定: 共通固定マスク（合成画像=正解マスク、アップロード画像・実物サンプル=HSV距離）",
+      "範囲判定: なし（共通固定マスク）",
+      "再着色: 陰影保持カラー化（Lab）",
+      "式: μ=mask内平均L*、Lout=clamp(Lin−μ+Lt, 0, 100)、(aout,bout)=(at,bt)",
+    ],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
 ];
 
 export function getMethod(id: string) {
@@ -102,6 +135,6 @@ export function getMethod(id: string) {
 
 export const METHOD_GROUPS = [
   { axis: "color", title: "色判定" },
-  { axis: "boundary", title: "境界制約" },
+  { axis: "boundary", title: "範囲判定" },
   { axis: "recolor", title: "再着色" },
 ] as const;

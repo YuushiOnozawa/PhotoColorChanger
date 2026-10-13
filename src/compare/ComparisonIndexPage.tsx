@@ -12,7 +12,7 @@ function ComparisonIndexPage() {
         </p>
         <h1 className="mb-3 text-3xl font-bold">色置き換え手法の比較</h1>
         <p className="text-[#6e675e]">
-          同じ画像とクリック位置を使って、色判定・境界制約・再着色をブラウザ内で比較できます。
+          同じ画像とクリック位置を使って、色判定・範囲判定・再着色をブラウザ内で比較できます。
         </p>
         <a
           className="mt-4 inline-block text-sm font-semibold text-[#8a482a] underline underline-offset-4"

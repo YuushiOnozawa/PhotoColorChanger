@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { rgbToHsv, rgbToLab } from "./colorSpaces";
-import { recolorHsvHue, recolorLabLuma, recolorSolid } from "./recolorMethods";
+import {
+  recolorHsvHue,
+  recolorLabLuma,
+  recolorLumaColorize,
+  recolorSolid,
+} from "./recolorMethods";
 import type { ImageLike } from "./types";
 
 function onePixel(color: readonly [number, number, number]): ImageLike {
@@ -27,6 +32,24 @@ describe("再着色アルゴリズム", () => {
     const afterL = rgbToLab([result.data[0], result.data[1], result.data[2]])[0];
 
     expect(Math.abs(afterL - beforeL)).toBeLessThan(1);
+  });
+
+  it("陰影保持カラー化はマスク内平均L*を基準に色を付け、局所差と外側を保つ", () => {
+    const image = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([128, 128, 128, 255, 144, 144, 144, 255, 90, 90, 90, 255]),
+    };
+    const mask = new Uint8Array([1, 1, 0]);
+    const result = recolorLumaColorize(image, mask, [110, 150, 125]);
+    const beforeFirstL = rgbToLab([128, 128, 128])[0];
+    const beforeSecondL = rgbToLab([144, 144, 144])[0];
+    const afterFirstL = rgbToLab([result.data[0], result.data[1], result.data[2]])[0];
+    const afterSecondL = rgbToLab([result.data[4], result.data[5], result.data[6]])[0];
+
+    expect(result.data[0] === result.data[1] && result.data[1] === result.data[2]).toBe(false);
+    expect(Math.abs((afterSecondL - afterFirstL) - (beforeSecondL - beforeFirstL))).toBeLessThan(1);
+    expect(Array.from(result.data.slice(8))).toEqual([90, 90, 90, 255]);
   });
 
   it("HSV色相シフトは彩度と明度を保つ", () => {
