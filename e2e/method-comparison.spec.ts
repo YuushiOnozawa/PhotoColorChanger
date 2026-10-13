@@ -11,6 +11,7 @@ const METHOD_IDS = [
   "mask-grabcut",
   "mask-grabcut-fast",
   "mask-grabcut-subject",
+  "mask-grabcut-lineart",
   "recolor-solid",
   "recolor-lab-luma",
   "recolor-hsv-hue",
