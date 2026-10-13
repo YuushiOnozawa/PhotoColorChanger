@@ -6,6 +6,7 @@
 |---|---|---|---|---|
 | 共通 | 一覧ページ・ナビゲーション・アップロード | Pages確認済 | 1 | ローカルPlaywright判定成功 |
 | 共通 | 合成画像fixture | Pages確認済 | 1 | |
+| 共通 | 実物サンプル2枚同時表示 | ローカル確認済 | 1 | `scripts/check-goal.sh --local` 成功 |
 | 色判定 | RGB | Pages確認済 | 1 | |
 | 色判定 | HSV | Pages確認済 | 1 | |
 | 色判定 | Lab ΔE | Pages確認済 | 1 | |

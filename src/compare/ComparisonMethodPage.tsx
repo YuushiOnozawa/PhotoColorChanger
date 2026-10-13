@@ -1,21 +1,46 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { hexToRgb } from "../app/color";
-import { ImageLoadError, loadImageFile } from "../app/imageLoader";
+import { fitImageDimensions, ImageLoadError, loadImageFile } from "../app/imageLoader";
 import { processComparisonMethod } from "./algorithms";
+import { EXAMPLE_IMAGES } from "./exampleImages";
 import { METHODS } from "./registry";
 import { createSyntheticImage } from "./syntheticImage";
 import type { ComparisonMethod, ImageLike, ImagePoint, RgbColor } from "./types";
 
 const DEFAULT_REPLACEMENT = "#2f6fdb";
+const EXAMPLE_MAX_EDGE = 1024;
+const EXAMPLE_CANVAS_MAX_EDGE = 512;
 
-function drawImage(canvas: HTMLCanvasElement, image: ImageLike) {
-  if (canvas.width !== image.width) canvas.width = image.width;
-  if (canvas.height !== image.height) canvas.height = image.height;
+type ExampleSample = {
+  name: string;
+  image: ImageLike;
+  seed: ImagePoint;
+};
+
+function drawImage(canvas: HTMLCanvasElement, image: ImageLike, maxEdge?: number) {
+  const dimensions =
+    maxEdge === undefined ? image : fitImageDimensions(image.width, image.height, maxEdge);
+  if (canvas.width !== dimensions.width) canvas.width = dimensions.width;
+  if (canvas.height !== dimensions.height) canvas.height = dimensions.height;
   const context = canvas.getContext("2d");
   if (!context) return;
-  const pixels = context.createImageData(image.width, image.height);
+
+  if (dimensions.width === image.width && dimensions.height === image.height) {
+    const pixels = context.createImageData(image.width, image.height);
+    pixels.data.set(image.data);
+    context.putImageData(pixels, 0, 0);
+    return;
+  }
+
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = image.width;
+  sourceCanvas.height = image.height;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) return;
+  const pixels = sourceContext.createImageData(image.width, image.height);
   pixels.data.set(image.data);
-  context.putImageData(pixels, 0, 0);
+  sourceContext.putImageData(pixels, 0, 0);
+  context.drawImage(sourceCanvas, 0, 0, dimensions.width, dimensions.height);
 }
 
 function readLoadedPixels(source: CanvasImageSource, width: number, height: number): ImageLike {
@@ -33,6 +58,15 @@ function colorFromHex(hex: string): RgbColor {
   return hexToRgb(hex) ?? [47, 111, 219];
 }
 
+function loadImageUrl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("画像を読み込めませんでした。"));
+    image.src = url;
+  });
+}
+
 function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const inputCanvasRef = useRef<HTMLCanvasElement>(null);
   const outputCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -44,6 +78,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const [imageName, setImageName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exampleSamples, setExampleSamples] = useState<ExampleSample[]>([]);
+  const exampleInputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
+  const exampleOutputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
   const methodIndex = METHODS.findIndex((item) => item.id === method.id);
 
   useEffect(() => {
@@ -64,6 +101,42 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
     drawImage(outputCanvasRef.current, result);
   }, [groundTruthMask, image, method.id, replacementColor, seed, tolerance]);
 
+  useEffect(() => {
+    if (exampleSamples.length === 0) return;
+
+    let sampleIndex = 0;
+    let timer: number | undefined;
+    const processNextSample = () => {
+      const sample = exampleSamples[sampleIndex];
+      if (!sample) return;
+      sampleIndex += 1;
+
+      const inputCanvas = exampleInputCanvasRefs.current[sample.name];
+      const outputCanvas = exampleOutputCanvasRefs.current[sample.name];
+      if (inputCanvas && outputCanvas) {
+        drawImage(inputCanvas, sample.image, EXAMPLE_CANVAS_MAX_EDGE);
+        const result = processComparisonMethod({
+          image: sample.image,
+          methodId: method.id,
+          seed: sample.seed,
+          replacement: colorFromHex(replacementColor),
+          tolerance,
+          fixedMask: null,
+        });
+        drawImage(outputCanvas, result, EXAMPLE_CANVAS_MAX_EDGE);
+      }
+
+      if (sampleIndex < exampleSamples.length) {
+        timer = window.setTimeout(processNextSample, 0);
+      }
+    };
+
+    timer = window.setTimeout(processNextSample, 0);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [exampleSamples, method.id, replacementColor, tolerance]);
+
   const loadSynthetic = () => {
     const synthetic = createSyntheticImage();
     setImage(synthetic.image);
@@ -72,6 +145,34 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
     setImageName("合成画像");
     setNotice(null);
     setError(null);
+  };
+
+  const loadExamples = async () => {
+    setError(null);
+
+    try {
+      const loadedExamples = await Promise.all(
+        EXAMPLE_IMAGES.map(async ({ name, url, seed: sourceSeed }) => {
+          const source = await loadImageUrl(url);
+          const sourceWidth = source.naturalWidth || source.width;
+          const sourceHeight = source.naturalHeight || source.height;
+          if (!sourceWidth || !sourceHeight) throw new Error("画像を読み込めませんでした。");
+
+          const dimensions = fitImageDimensions(sourceWidth, sourceHeight, EXAMPLE_MAX_EDGE);
+          return {
+            name,
+            image: readLoadedPixels(source, dimensions.width, dimensions.height),
+            seed: [
+              Math.floor((sourceSeed[0] * dimensions.width) / sourceWidth),
+              Math.floor((sourceSeed[1] * dimensions.height) / sourceHeight),
+            ] as ImagePoint,
+          };
+        }),
+      );
+      setExampleSamples(loadedExamples);
+    } catch {
+      setError("実物サンプルを読み込めませんでした。");
+    }
   };
 
   const loadUploadedFile = async (file: File | undefined) => {
@@ -109,9 +210,24 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
     ]);
   };
 
+  const selectExampleSeed = (sample: ExampleSample, event: MouseEvent<HTMLCanvasElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width === 0 || bounds.height === 0) return;
+    const x = Math.floor(((event.clientX - bounds.left) / bounds.width) * sample.image.width);
+    const y = Math.floor(((event.clientY - bounds.top) / bounds.height) * sample.image.height);
+    const seed: ImagePoint = [
+      Math.max(0, Math.min(sample.image.width - 1, x)),
+      Math.max(0, Math.min(sample.image.height - 1, y)),
+    ];
+    setExampleSamples((current) =>
+      current.map((item) => (item.name === sample.name ? { ...item, seed } : item)),
+    );
+  };
+
   const displayedTolerance = Number.isInteger(tolerance) ? tolerance : tolerance.toFixed(1);
   const showUploadedMaskNotice =
     method.axis === "recolor" && image !== null && groundTruthMask === null;
+  const showExampleMaskNotice = method.axis === "recolor" && exampleSamples.length > 0;
 
   return (
     <main
@@ -181,6 +297,14 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           >
             合成画像を読み込む
           </button>
+          <button
+            className="rounded-lg bg-[#8a482a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#713b24]"
+            data-testid="compare-load-examples"
+            onClick={() => void loadExamples()}
+            type="button"
+          >
+            実物サンプル（sample1・sample2）を読み込む
+          </button>
           <label className="grid gap-2 text-sm font-semibold">
             置換色
             <input
@@ -229,6 +353,11 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
             アップロード画像ではHSVマスクを固定マスクとして使用しています。
           </p>
         )}
+        {showExampleMaskNotice && (
+          <p className="mt-4 text-sm text-[#6e675e]">
+            実物サンプルではHSVマスクを固定マスクとして使用しています。
+          </p>
+        )}
         {error && (
           <p className="mt-4 text-sm font-semibold text-red-700" role="alert">
             {error}
@@ -259,6 +388,51 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           />
         </div>
       </section>
+
+      {exampleSamples.length > 0 && (
+        <section className="mt-6 grid gap-5 md:grid-cols-2">
+          {exampleSamples.map((sample) => (
+            <div
+              className="min-w-0 rounded-2xl border border-[#ded6c9] bg-white p-4"
+              data-testid={`compare-example-${sample.name}`}
+              key={sample.name}
+            >
+              <h2 className="mb-1 font-bold">実物サンプル（{sample.name}）</h2>
+              <p
+                className="mb-3 text-sm text-[#6e675e]"
+                data-testid={`compare-example-${sample.name}-seed`}
+              >
+                基準点（処理画像）: ({sample.seed[0]}, {sample.seed[1]})
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0">
+                  <p className="mb-2 text-sm font-semibold">入力</p>
+                  <canvas
+                    aria-label={`${sample.name} 入力画像。クリックして基準点を選択`}
+                    className="block h-auto max-h-[520px] max-w-full cursor-crosshair border border-[#e8e1d7] object-contain"
+                    data-testid={`compare-example-${sample.name}-input`}
+                    onClick={(event) => selectExampleSeed(sample, event)}
+                    ref={(canvas) => {
+                      exampleInputCanvasRefs.current[sample.name] = canvas;
+                    }}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="mb-2 text-sm font-semibold">出力</p>
+                  <canvas
+                    aria-label={`${sample.name} 処理結果`}
+                    className="block h-auto max-h-[520px] max-w-full border border-[#e8e1d7] object-contain"
+                    data-testid={`compare-example-${sample.name}-output`}
+                    ref={(canvas) => {
+                      exampleOutputCanvasRefs.current[sample.name] = canvas;
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }
