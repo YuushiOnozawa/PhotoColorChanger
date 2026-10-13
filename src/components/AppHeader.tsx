@@ -10,6 +10,12 @@ function AppHeader() {
       <p className="text-[#6e675e] leading-[1.7]">
         プラモデルの写真を読み込み、色を置き換えたイメージをブラウザ内で確認できます。
       </p>
+      <a
+        className="mt-3 inline-block text-sm font-semibold text-[#8a482a] underline underline-offset-4"
+        href="#/compare"
+      >
+        手法比較
+      </a>
     </header>
   );
 }
