@@ -34,6 +34,11 @@ PRプレビューのGitHub Pages上で、ブラウザで動く色置き換え手
   - 画像アップロード入力 `compare-upload`、合成画像を読み込むボタン `compare-load-synthetic`
   - 入力キャンバス `compare-input`、出力キャンバス `compare-output`、設定値表示 `compare-params`
 - 合成画像を読み込むと、既定のクリック位置で自動的に処理し、出力キャンバスに結果を描く。
+- 実物サンプル（`example/sample1.png` と `example/sample2.png`、ユーザーが公開を承認済み）：
+  - ボタン `compare-load-examples` で2枚を同時に読み込み、横並び（狭い画面では縦並び）で表示する。
+  - 各サンプルのパネル `compare-example-sample1` / `compare-example-sample2` に、入力キャンバス `compare-example-<name>-input` と出力キャンバス `compare-example-<name>-output` を置く。
+  - 各サンプルに既定の基準点（塗装部品上）を持たせ、読み込み時に自動で処理する。入力のクリックでサンプルごとに基準点を変えられ、手法ページ間で維持する。
+  - 処理負荷を抑えるため、長辺1024px程度に縮小して処理してよい。
 
 ## 対象外
 
@@ -43,7 +48,7 @@ PRプレビューのGitHub Pages上で、ブラウザで動く色置き換え手
 
 ## 制約
 
-- 権利表示のある画像（example/sample1、sample2）はリポジトリにもPagesにも含めない。
+- `example/sample1.png` と `example/sample2.png` はPagesで公開してよい（2026-10-13 ユーザー承認）。`.jpeg` 版や `sample2-cut.png` 等の未追跡画像は含めない。
 - 自動確認には、プログラムで生成した合成画像を使う。
 - 新しい依存パッケージを追加しない（必要ならユーザーに確認）。
 - PRは1本のみ。mainへのマージはユーザーが行う。
@@ -55,6 +60,7 @@ PRプレビューのGitHub Pages上で、ブラウザで動く色置き換え手
 3. Playwrightでプレビューを開き、次を確認する。
    - 全手法ページと一覧ページが存在し、リンクで遷移できる。
    - 合成画像で、各手法の出力が入力から変化する。
+   - 実物サンプル2枚を同時に読み込み、各手法で両方の出力が入力から変化する。
    - 画像処理中に外部へのネットワーク送信が発生しない。
    - 各手法のスクリーンショットを保存する。
 

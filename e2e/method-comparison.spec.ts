@@ -13,6 +13,27 @@ const METHOD_IDS = [
   "recolor-hsv-hue",
 ] as const;
 
+async function changedPixelRatio(page: Page, inputTestId: string, outputTestId: string) {
+  const input = await readCanvasPixels(page, inputTestId);
+  const output = await readCanvasPixels(page, outputTestId);
+  expect(
+    { width: output.width, height: output.height },
+    `${inputTestId} と ${outputTestId} のサイズが一致すること`,
+  ).toEqual({ width: input.width, height: input.height });
+
+  let changedPixels = 0;
+  for (let index = 0; index < input.pixels.length; index += 4) {
+    if (
+      Math.abs(input.pixels[index] - output.pixels[index]) > 8 ||
+      Math.abs(input.pixels[index + 1] - output.pixels[index + 1]) > 8 ||
+      Math.abs(input.pixels[index + 2] - output.pixels[index + 2]) > 8
+    ) {
+      changedPixels += 1;
+    }
+  }
+  return changedPixels / (input.width * input.height);
+}
+
 async function readCanvasPixels(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((element) => {
     if (!(element instanceof HTMLCanvasElement)) {
@@ -140,6 +161,33 @@ test.describe("合成画像を使った各手法の処理", () => {
       await mkdir(screenshotDirectory, { recursive: true });
       await page.screenshot({
         path: resolve(screenshotDirectory, `${methodId}.png`),
+        fullPage: true,
+      });
+    });
+  }
+});
+
+test.describe("実物サンプル2枚を使った各手法の処理", () => {
+  for (const methodId of METHOD_IDS) {
+    test(`${methodId} でsample1とsample2の両方が処理される`, async ({ page }) => {
+      await page.goto(`./#/compare/${methodId}`);
+      await expect(page.getByTestId(`compare-method-${methodId}`)).toBeVisible();
+      await page.getByTestId("compare-load-examples").click();
+
+      for (const name of ["sample1", "sample2"]) {
+        await expect(page.getByTestId(`compare-example-${name}`)).toBeVisible();
+        await expect
+          .poll(
+            () => changedPixelRatio(page, `compare-example-${name}-input`, `compare-example-${name}-output`),
+            { message: `${name} の出力が入力から変化すること`, timeout: 30_000 },
+          )
+          .toBeGreaterThan(0.001);
+      }
+
+      const screenshotDirectory = resolve(process.cwd(), ".loop/screenshots");
+      await mkdir(screenshotDirectory, { recursive: true });
+      await page.screenshot({
+        path: resolve(screenshotDirectory, `${methodId}-examples.png`),
         fullPage: true,
       });
     });
