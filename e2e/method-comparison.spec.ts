@@ -10,6 +10,7 @@ const METHOD_IDS = [
   "boundary-xdog-sobel",
   "mask-grabcut",
   "mask-grabcut-fast",
+  "mask-grabcut-subject",
   "recolor-solid",
   "recolor-lab-luma",
   "recolor-hsv-hue",

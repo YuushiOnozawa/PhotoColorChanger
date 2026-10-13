@@ -13,7 +13,7 @@ PRプレビューのGitHub Pages上で、ブラウザで動く色置き換え手
 | 軸 | 手法 | 固定条件 |
 |---|---|---|
 | 色判定 | RGB距離（現行） / HSV距離（tol12相当） / Lab ΔE（明度重み0.35） | 再着色=単色置換、境界制約なし |
-| 範囲判定 | なし / XDoG→Sobel＋連結領域 / GrabCut（HSV初期化、OpenCV.js） / GrabCut高速版（ROI切り出し＋長辺512px縮小） | 色判定=HSV、再着色=単色置換 |
+| 範囲判定 | なし / XDoG→Sobel＋連結領域 / GrabCut（HSV初期化、OpenCV.js） / GrabCut高速版（長辺512px縮小） / 背景除外＋GrabCut（被写体抽出→部品抽出の2段階） | 色判定=HSV、再着色=単色置換 |
 | 再着色 | 単色置換 / Lab L*保持＋a\*b\*置換 / HSV色相シフト / 陰影保持カラー化（Lab：L*を置換色の平均へ平行移動、a\*b\*は置換色） | 共通の固定マスク |
 
 - 初期値（tol12、明度重み0.35）はsample2で決めた値で、色空間間の公平性は保証しない。
@@ -30,7 +30,7 @@ PRプレビューのGitHub Pages上で、ブラウザで動く色置き換え手
 ### 実装規約（自動判定が依存する）
 
 - URL（ハッシュルーティング）：一覧 `#/compare`、手法 `#/compare/<method-id>`
-- method-id：`color-rgb` `color-hsv` `color-lab` `boundary-none` `boundary-xdog-sobel` `mask-grabcut` `mask-grabcut-fast` `recolor-solid` `recolor-lab-luma` `recolor-hsv-hue` `recolor-luma-colorize`
+- method-id：`color-rgb` `color-hsv` `color-lab` `boundary-none` `boundary-xdog-sobel` `mask-grabcut` `mask-grabcut-fast` `mask-grabcut-subject` `recolor-solid` `recolor-lab-luma` `recolor-hsv-hue` `recolor-luma-colorize`
 - data-testid：
   - 一覧ページ `compare-index`、各手法へのリンク `compare-link-<method-id>`
   - 手法ページ `compare-method-<method-id>`、一覧へ戻るリンク `compare-back`、前後の手法へのリンク `compare-prev` / `compare-next`
