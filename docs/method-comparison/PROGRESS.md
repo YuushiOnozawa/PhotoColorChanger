@@ -13,7 +13,8 @@
 | 範囲判定 | なし | Pages確認済 | 1 | |
 | 範囲判定 | XDoG→Sobel＋連結領域 | Pages確認済 | 1 | |
 | 範囲判定 | GrabCut（HSV初期化） | ローカル確認済 | 1 | 型検査・lint・テスト・build済、Pages未確認 |
-| 範囲判定 | GrabCut高速版（ROI＋512px・Worker） | ローカル確認済 | 1 | 型検査・lint・32テスト・build済、Pages未確認 |
+| 範囲判定 | GrabCut高速版（512px・Worker） | ローカル確認済 | 2 | ROIを撤去し、全画像から初期マスクを作って長辺512pxへ縮小。型検査・lint・テスト・build済、Pages未確認 |
+| 範囲判定 | 背景除外＋GrabCut（2段階・Worker） | ローカル確認済 | 1 | 矩形初期化の被写体抽出をキャッシュし、クリックごとに部品を抽出。失敗時は高速版へフォールバック。型検査・lint・テスト・build済、Pages未確認 |
 | 再着色 | 単色置換 | Pages確認済 | 1 | |
 | 再着色 | Lab L*保持 | Pages確認済 | 1 | |
 | 再着色 | HSV色相シフト | Pages確認済 | 1 | |

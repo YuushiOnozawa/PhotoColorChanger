@@ -5,15 +5,17 @@ import { processComparisonMethod } from "./algorithms";
 import { EXAMPLE_IMAGES } from "./exampleImages";
 import { METHODS } from "./registry";
 import { createSyntheticImage } from "./syntheticImage";
-import type { GrabCutProcessingStatus } from "./grabcutWorkerClient";
+import type { GrabCutProcessingStatus, GrabCutSubjectInfo } from "./grabcutWorkerClient";
 import type { ComparisonMethod, ImageLike, ImagePoint, RgbColor } from "./types";
 
 const DEFAULT_REPLACEMENT = "#2f6fdb";
 const EXAMPLE_MAX_EDGE = 1024;
 const EXAMPLE_CANVAS_MAX_EDGE = 512;
+let uploadRevision = 0;
 
 type ExampleSample = {
   name: string;
+  imageKey: string;
   image: ImageLike;
   seed: ImagePoint;
 };
@@ -93,13 +95,26 @@ function ProcessingOutput({
 }
 
 function isGrabCutMethod(methodId: string): boolean {
-  return methodId === "mask-grabcut" || methodId === "mask-grabcut-fast";
+  return (
+    methodId === "mask-grabcut" ||
+    methodId === "mask-grabcut-fast" ||
+    methodId === "mask-grabcut-subject"
+  );
+}
+
+function formatSubjectStage1Info(info: GrabCutSubjectInfo): string {
+  return info.used
+    ? `段1：被写体抽出あり（被写体 ${Math.round(info.foregroundRatio * 100)}%）`
+    : `段1：なし（${info.reason}。高速版へフォールバック）`;
 }
 
 function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const inputCanvasRef = useRef<HTMLCanvasElement>(null);
   const outputCanvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<ImageLike | null>(null);
+  const [imageKey, setImageKey] = useState("");
+  const [imageSubjectInfo, setImageSubjectInfo] = useState<GrabCutSubjectInfo | null>(null);
+  const [exampleSubjectInfo, setExampleSubjectInfo] = useState<Record<string, GrabCutSubjectInfo>>({});
   const [groundTruthMask, setGroundTruthMask] = useState<Uint8Array | null>(null);
   const [seed, setSeed] = useState<ImagePoint>([0, 0]);
   const [replacementColor, setReplacementColor] = useState(DEFAULT_REPLACEMENT);
@@ -137,6 +152,8 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
 
       setError(null);
       const usesGrabCut = isGrabCutMethod(method.id);
+      setImageSubjectInfo(null);
+      setExampleSubjectInfo({});
       setIsProcessing(usesGrabCut);
       setProcessingStatus(null);
       if (usesGrabCut) {
@@ -153,12 +170,16 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
         const result = await processComparisonMethod({
           image,
           methodId: method.id,
+          imageKey,
           seed,
           replacement,
           tolerance,
           fixedMask: groundTruthMask,
           onWorkerStatus: (status) => {
             if (!stale) setProcessingStatus(status);
+          },
+          onSubjectInfo: (info) => {
+            if (!stale) setImageSubjectInfo(info);
           },
         });
         if (stale) return;
@@ -176,12 +197,18 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
         const result = await processComparisonMethod({
           image: sample.image,
           methodId: method.id,
+          imageKey: sample.imageKey,
           seed: sample.seed,
           replacement,
           tolerance,
           fixedMask: null,
           onWorkerStatus: (status) => {
             if (!stale) setProcessingStatus(status);
+          },
+          onSubjectInfo: (info) => {
+            if (!stale) {
+              setExampleSubjectInfo((current) => ({ ...current, [sample.name]: info }));
+            }
           },
         });
         if (stale) return;
@@ -208,11 +235,12 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
     return () => {
       stale = true;
     };
-  }, [exampleSamples, groundTruthMask, image, method.id, replacementColor, seed, tolerance]);
+  }, [exampleSamples, groundTruthMask, image, imageKey, method.id, replacementColor, seed, tolerance]);
 
   const loadSynthetic = () => {
     const synthetic = createSyntheticImage();
     setImage(synthetic.image);
+    setImageKey("synthetic");
     setGroundTruthMask(synthetic.groundTruthMask);
     setSeed(synthetic.seed);
     setImageName("合成画像");
@@ -234,6 +262,7 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           const dimensions = fitImageDimensions(sourceWidth, sourceHeight, EXAMPLE_MAX_EDGE);
           return {
             name,
+            imageKey: `example:${name}`,
             image: readLoadedPixels(source, dimensions.width, dimensions.height),
             seed: [
               Math.floor((sourceSeed[0] * dimensions.width) / sourceWidth),
@@ -256,6 +285,8 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
       const loaded = await loadImageFile(file);
       const pixels = readLoadedPixels(loaded.source, loaded.width, loaded.height);
       setImage(pixels);
+      uploadRevision += 1;
+      setImageKey(`upload:${uploadRevision}`);
       setGroundTruthMask(null);
       setSeed([Math.floor(loaded.width / 2), Math.floor(loaded.height / 2)]);
       setImageName(loaded.name);
@@ -464,6 +495,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
               ref={outputCanvasRef}
             />
           </ProcessingOutput>
+          {method.id === "mask-grabcut-subject" && image && imageSubjectInfo && (
+            <p className="mt-2 text-sm text-[#6e675e]">{formatSubjectStage1Info(imageSubjectInfo)}</p>
+          )}
         </div>
       </section>
 
@@ -507,6 +541,11 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
                       }}
                     />
                   </ProcessingOutput>
+                  {method.id === "mask-grabcut-subject" && exampleSubjectInfo[sample.name] && (
+                    <p className="mt-2 text-sm text-[#6e675e]">
+                      {formatSubjectStage1Info(exampleSubjectInfo[sample.name])}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

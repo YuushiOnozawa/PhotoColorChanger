@@ -11,6 +11,7 @@ describe("比較手法レジストリ", () => {
       "boundary-xdog-sobel",
       "mask-grabcut",
       "mask-grabcut-fast",
+      "mask-grabcut-subject",
       "recolor-solid",
       "recolor-lab-luma",
       "recolor-hsv-hue",
@@ -26,11 +27,15 @@ describe("比較手法レジストリ", () => {
       "画像端=確定背景",
     );
     const fastParams = METHODS.find(({ id }) => id === "mask-grabcut-fast")?.params.join(" ");
-    expect(fastParams).toContain("margin max(32px,画像長辺の15%)");
-    expect(fastParams).toContain("ROI長辺512px以下");
+    expect(fastParams).toContain("全画像を長辺512px以下");
     expect(fastParams).toContain("反復回数4");
-    expect(fastParams).toContain("初期マスク縮小=最近傍");
+    expect(fastParams).toContain("縮小は最近傍");
     expect(fastParams).toContain("mask-grabcutは全解像度版");
+    const subjectParams = METHODS.find(({ id }) => id === "mask-grabcut-subject")?.params.join(" ");
+    expect(subjectParams).toContain("GC_INIT_WITH_RECT");
+    expect(subjectParams).toContain("5%未満または95%超");
+    expect(subjectParams).toContain("膨張外=確定背景");
+    expect(subjectParams).toContain("GC_INIT_WITH_MASKを4回反復");
     expect(METHODS.find(({ id }) => id === "recolor-luma-colorize")?.params.join(" ")).toContain(
       "Lout=clamp(Lin−μ+Lt, 0, 100)",
     );
