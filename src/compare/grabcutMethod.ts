@@ -1,3 +1,4 @@
+import openCvUrl from "@techstark/opencv-js/dist/opencv.js?url";
 import type { CV } from "@techstark/opencv-js";
 import { connectedRegionFromSeed } from "./boundaryMethods";
 import { createHsvMask } from "./colorMethods";
@@ -17,24 +18,34 @@ type OpenCvRuntime = CV & {
   onRuntimeInitialized?: () => void;
 };
 type OpenCvModule = OpenCvRuntime | Promise<OpenCvRuntime>;
-type OpenCvExports = { default?: OpenCvModule };
 
-let openCvPromise: Promise<CV> | undefined;
+let openCvPromise: Promise<{ cv: CV }> | undefined;
 
-function loadOpenCv(): Promise<CV> {
+function loadOpenCv(): Promise<{ cv: CV }> {
   if (!openCvPromise) {
-    openCvPromise = (async () => {
-      const imported = (await import("@techstark/opencv-js")) as unknown as OpenCvExports &
-        OpenCvRuntime;
-      const cvModule = imported.default ?? imported;
-      if (cvModule instanceof Promise) return cvModule;
-      if (typeof cvModule.Mat === "function") return cvModule;
-      return new Promise<CV>((resolve, reject) => {
-        cvModule.onRuntimeInitialized = () => resolve(cvModule);
-        cvModule.onAbort = (reason) =>
-          reject(new Error("OpenCV runtime aborted: " + String(reason ?? "unknown error")));
-      });
-    })().catch((error: unknown) => {
+    openCvPromise = new Promise<{ cv: CV }>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = openCvUrl;
+      script.async = true;
+      script.onload = () => {
+        const cvModule = (window as typeof window & { cv?: OpenCvModule }).cv;
+        if (!cvModule) {
+          reject(new Error("OpenCV failed to initialize"));
+          return;
+        }
+        if (cvModule instanceof Promise) {
+          void cvModule.then((cv) => resolve({ cv }), reject);
+        } else if (typeof cvModule.Mat === "function") {
+          resolve({ cv: cvModule });
+        } else {
+          cvModule.onRuntimeInitialized = () => resolve({ cv: cvModule });
+          cvModule.onAbort = (reason) =>
+            reject(new Error("OpenCV runtime aborted: " + String(reason ?? "unknown error")));
+        }
+      };
+      script.onerror = () => reject(new Error("Failed to load OpenCV script"));
+      document.head.append(script);
+    }).catch((error: unknown) => {
       openCvPromise = undefined;
       throw error;
     });
@@ -85,7 +96,7 @@ export async function processGrabCut(
   tolerance: number,
   replacement: RgbColor,
 ): Promise<ImageLike> {
-  const cv = await loadOpenCv();
+  const { cv } = await loadOpenCv();
   const hsvMask = createHsvMask(image, seed, tolerance);
   const initializationMask = createGrabCutInitializationMask(image, hsvMask, seed);
   const rgbData = new Uint8Array(image.width * image.height * 3);
