@@ -1,5 +1,9 @@
 import openCvUrl from "@techstark/opencv-js/dist/opencv.js?url";
 import type { CV } from "@techstark/opencv-js";
+import {
+  DEFAULT_SHADOW_LINE_THRESHOLD,
+  createShadowNormalizedLineArtPixels,
+} from "../app/lineArt";
 import { connectedRegionFromSeed } from "./boundaryMethods";
 import { createHsvMask } from "./colorMethods";
 import {
@@ -11,13 +15,24 @@ import {
   type GrabCutSubjectRect,
 } from "./grabcutHelpers";
 import { createGrabCutInitializationMask } from "./grabcutMethod";
+import {
+  createLineArtVotingRegion,
+  findNonLineRegions,
+  resolveLinePixels,
+  voteNonLineRegions,
+  type LineArtRegionStats,
+} from "./grabcutLineArt";
 import type { ImageLike, ImagePoint } from "./types";
 
 const SEED_RADIUS = 4;
 const GRABCUT_ITERATIONS = 4;
 const FAST_MAX_EDGE = 512;
 
-type GrabCutMethodId = "mask-grabcut" | "mask-grabcut-fast" | "mask-grabcut-subject";
+type GrabCutMethodId =
+  | "mask-grabcut"
+  | "mask-grabcut-fast"
+  | "mask-grabcut-subject"
+  | "mask-grabcut-lineart";
 type SubjectStage1Info =
   | { used: true; foregroundRatio: number }
   | { used: false; reason: string };
@@ -31,10 +46,20 @@ type GrabCutRequest = {
   tolerance: number;
   imageKey: string;
 };
-type GrabCutResult = { mask: Uint8Array; subjectInfo?: SubjectStage1Info };
+type GrabCutResult = {
+  mask: Uint8Array;
+  subjectInfo?: SubjectStage1Info;
+  lineArtInfo?: LineArtRegionStats;
+};
 type GrabCutResponse =
   | { id: number; type: "status"; status: "initializing" | "processing" }
-  | { id: number; type: "result"; mask: ArrayBuffer; subjectInfo?: SubjectStage1Info }
+  | {
+      id: number;
+      type: "result";
+      mask: ArrayBuffer;
+      subjectInfo?: SubjectStage1Info;
+      lineArtInfo?: LineArtRegionStats;
+    }
   | { id: number; type: "error"; error: string };
 
 type CvMat = InstanceType<CV["Mat"]>;
@@ -181,6 +206,59 @@ function restoreMask(mask: Uint8Array, request: GrabCutRequest, width: number, h
   return width === request.width && height === request.height
     ? mask
     : resizeBinaryMaskBilinear(mask, width, height, request.width, request.height);
+}
+
+function applyLineArtRegionVoting(
+  image: ImageLike,
+  grabCutMask: Uint8Array,
+  subjectForeground: Uint8Array | null,
+) {
+  const votingRegion = createLineArtVotingRegion(subjectForeground, image.width, image.height);
+  const lineArtPixels = createShadowNormalizedLineArtPixels(
+    image.data,
+    image.width,
+    image.height,
+    DEFAULT_SHADOW_LINE_THRESHOLD,
+  );
+  const lineMask = new Uint8Array(grabCutMask.length);
+  for (let pixel = 0; pixel < lineMask.length; pixel += 1) {
+    lineMask[pixel] = votingRegion[pixel] === 1 && lineArtPixels[pixel * 4] === 0 ? 1 : 0;
+  }
+  const regions = findNonLineRegions(votingRegion, lineMask, image.width, image.height);
+  const { mask, stats } = voteNonLineRegions(grabCutMask, regions);
+  return {
+    mask: resolveLinePixels(
+      grabCutMask,
+      mask,
+      votingRegion,
+      lineMask,
+      image.width,
+      image.height,
+    ),
+    stats,
+  };
+}
+
+function restoreSubjectMask(
+  mask: Uint8Array,
+  request: GrabCutRequest,
+  processingImage: CvMat,
+  subjectForeground: Uint8Array | null,
+  width: number,
+  height: number,
+): Pick<GrabCutResult, "mask" | "lineArtInfo"> {
+  if (request.methodId === "mask-grabcut-lineart") {
+    const lineArt = applyLineArtRegionVoting(
+      createImageLike(processingImage),
+      mask,
+      subjectForeground,
+    );
+    return {
+      mask: restoreMask(lineArt.mask, request, width, height),
+      lineArtInfo: lineArt.stats,
+    };
+  }
+  return { mask: restoreMask(mask, request, width, height) };
 }
 
 function createFastInitializationMask(
@@ -337,7 +415,14 @@ function processScaledRequest(request: GrabCutRequest, cv: CV, image: ImageLike)
         cv,
       );
       return {
-        mask: restoreMask(mask, request, dimensions.width, dimensions.height),
+        ...restoreSubjectMask(
+          mask,
+          request,
+          processingImage,
+          null,
+          dimensions.width,
+          dimensions.height,
+        ),
         subjectInfo: { used: false, reason: failureReason },
       };
     }
@@ -367,7 +452,14 @@ function processScaledRequest(request: GrabCutRequest, cv: CV, image: ImageLike)
       cv,
     );
     return {
-      mask: restoreMask(mask, request, dimensions.width, dimensions.height),
+      ...restoreSubjectMask(
+        mask,
+        request,
+        processingImage,
+        subject.foregroundMask,
+        dimensions.width,
+        dimensions.height,
+      ),
       subjectInfo: { used: true, foregroundRatio: subject.foregroundRatio },
     };
   } finally {
@@ -404,6 +496,7 @@ workerScope.onmessage = (event: MessageEvent<GrabCutRequest>) => {
           type: "result",
           mask: buffer,
           subjectInfo: result.subjectInfo,
+          lineArtInfo: result.lineArtInfo,
         },
         [buffer],
       );

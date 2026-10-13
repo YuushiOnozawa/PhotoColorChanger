@@ -5,7 +5,11 @@ import { processComparisonMethod } from "./algorithms";
 import { EXAMPLE_IMAGES } from "./exampleImages";
 import { METHODS } from "./registry";
 import { createSyntheticImage } from "./syntheticImage";
-import type { GrabCutProcessingStatus, GrabCutSubjectInfo } from "./grabcutWorkerClient";
+import type {
+  GrabCutLineArtInfo,
+  GrabCutProcessingStatus,
+  GrabCutSubjectInfo,
+} from "./grabcutWorkerClient";
 import type { ComparisonMethod, ImageLike, ImagePoint, RgbColor } from "./types";
 
 const DEFAULT_REPLACEMENT = "#2f6fdb";
@@ -98,7 +102,8 @@ function isGrabCutMethod(methodId: string): boolean {
   return (
     methodId === "mask-grabcut" ||
     methodId === "mask-grabcut-fast" ||
-    methodId === "mask-grabcut-subject"
+    methodId === "mask-grabcut-subject" ||
+    methodId === "mask-grabcut-lineart"
   );
 }
 
@@ -108,6 +113,10 @@ function formatSubjectStage1Info(info: GrabCutSubjectInfo): string {
     : `段1：なし（${info.reason}。高速版へフォールバック）`;
 }
 
+function formatLineArtInfo(info: GrabCutLineArtInfo): string {
+  return `線画領域: ${info.regionCount}個（前景化 ${info.foregrounded} / 背景化 ${info.backgrounded} / 維持 ${info.kept} / 未分割 ${info.unsplit}）`;
+}
+
 function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const inputCanvasRef = useRef<HTMLCanvasElement>(null);
   const outputCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,6 +124,8 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const [imageKey, setImageKey] = useState("");
   const [imageSubjectInfo, setImageSubjectInfo] = useState<GrabCutSubjectInfo | null>(null);
   const [exampleSubjectInfo, setExampleSubjectInfo] = useState<Record<string, GrabCutSubjectInfo>>({});
+  const [imageLineArtInfo, setImageLineArtInfo] = useState<GrabCutLineArtInfo | null>(null);
+  const [exampleLineArtInfo, setExampleLineArtInfo] = useState<Record<string, GrabCutLineArtInfo>>({});
   const [groundTruthMask, setGroundTruthMask] = useState<Uint8Array | null>(null);
   const [seed, setSeed] = useState<ImagePoint>([0, 0]);
   const [replacementColor, setReplacementColor] = useState(DEFAULT_REPLACEMENT);
@@ -154,6 +165,8 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
       const usesGrabCut = isGrabCutMethod(method.id);
       setImageSubjectInfo(null);
       setExampleSubjectInfo({});
+      setImageLineArtInfo(null);
+      setExampleLineArtInfo({});
       setIsProcessing(usesGrabCut);
       setProcessingStatus(null);
       if (usesGrabCut) {
@@ -180,6 +193,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           },
           onSubjectInfo: (info) => {
             if (!stale) setImageSubjectInfo(info);
+          },
+          onLineArtInfo: (info) => {
+            if (!stale) setImageLineArtInfo(info);
           },
         });
         if (stale) return;
@@ -208,6 +224,11 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           onSubjectInfo: (info) => {
             if (!stale) {
               setExampleSubjectInfo((current) => ({ ...current, [sample.name]: info }));
+            }
+          },
+          onLineArtInfo: (info) => {
+            if (!stale) {
+              setExampleLineArtInfo((current) => ({ ...current, [sample.name]: info }));
             }
           },
         });
@@ -495,8 +516,13 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
               ref={outputCanvasRef}
             />
           </ProcessingOutput>
-          {method.id === "mask-grabcut-subject" && image && imageSubjectInfo && (
-            <p className="mt-2 text-sm text-[#6e675e]">{formatSubjectStage1Info(imageSubjectInfo)}</p>
+          {(method.id === "mask-grabcut-subject" || method.id === "mask-grabcut-lineart") &&
+            image &&
+            imageSubjectInfo && (
+              <p className="mt-2 text-sm text-[#6e675e]">{formatSubjectStage1Info(imageSubjectInfo)}</p>
+            )}
+          {method.id === "mask-grabcut-lineart" && image && imageLineArtInfo && (
+            <p className="mt-2 text-sm text-[#6e675e]">{formatLineArtInfo(imageLineArtInfo)}</p>
           )}
         </div>
       </section>
@@ -541,9 +567,16 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
                       }}
                     />
                   </ProcessingOutput>
-                  {method.id === "mask-grabcut-subject" && exampleSubjectInfo[sample.name] && (
+                  {(method.id === "mask-grabcut-subject" ||
+                    method.id === "mask-grabcut-lineart") &&
+                    exampleSubjectInfo[sample.name] && (
+                      <p className="mt-2 text-sm text-[#6e675e]">
+                        {formatSubjectStage1Info(exampleSubjectInfo[sample.name])}
+                      </p>
+                    )}
+                  {method.id === "mask-grabcut-lineart" && exampleLineArtInfo[sample.name] && (
                     <p className="mt-2 text-sm text-[#6e675e]">
-                      {formatSubjectStage1Info(exampleSubjectInfo[sample.name])}
+                      {formatLineArtInfo(exampleLineArtInfo[sample.name])}
                     </p>
                   )}
                 </div>

@@ -1,6 +1,7 @@
 import { createBoundaryConstrainedMask } from "./boundaryMethods";
 import {
   processGrabCutMask,
+  type GrabCutLineArtInfo,
   type GrabCutProcessingStatus,
   type GrabCutSubjectInfo,
 } from "./grabcutWorkerClient";
@@ -23,6 +24,7 @@ export type ProcessOptions = {
   fixedMask?: Uint8Array | null;
   onWorkerStatus?: (status: GrabCutProcessingStatus) => void;
   onSubjectInfo?: (info: GrabCutSubjectInfo) => void;
+  onLineArtInfo?: (info: GrabCutLineArtInfo) => void;
 };
 
 export function processComparisonMethod({
@@ -35,17 +37,20 @@ export function processComparisonMethod({
   fixedMask,
   onWorkerStatus,
   onSubjectInfo,
+  onLineArtInfo,
 }: ProcessOptions): ImageLike | Promise<ImageLike> {
   if (methodId === "color-rgb") return recolorRgb(image, seed, replacement, tolerance);
 
   if (
     methodId === "mask-grabcut" ||
     methodId === "mask-grabcut-fast" ||
-    methodId === "mask-grabcut-subject"
+    methodId === "mask-grabcut-subject" ||
+    methodId === "mask-grabcut-lineart"
   ) {
     return processGrabCutMask(image, methodId, seed, tolerance, imageKey, onWorkerStatus).then(
-      ({ mask, subjectInfo }) => {
+      ({ mask, subjectInfo, lineArtInfo }) => {
         if (subjectInfo) onSubjectInfo?.(subjectInfo);
+        if (lineArtInfo) onLineArtInfo?.(lineArtInfo);
         return recolorSolid(image, mask, replacement);
       },
     );

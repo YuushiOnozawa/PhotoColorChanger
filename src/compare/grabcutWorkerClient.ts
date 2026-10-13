@@ -1,10 +1,16 @@
+import type { LineArtRegionStats } from "./grabcutLineArt";
 import type { ImageLike, ImagePoint } from "./types";
 
 export type GrabCutProcessingStatus = "initializing" | "processing";
 export type GrabCutSubjectInfo =
   | { used: true; foregroundRatio: number }
   | { used: false; reason: string };
-export type GrabCutMethodId = "mask-grabcut" | "mask-grabcut-fast" | "mask-grabcut-subject";
+export type GrabCutLineArtInfo = LineArtRegionStats;
+export type GrabCutMethodId =
+  | "mask-grabcut"
+  | "mask-grabcut-fast"
+  | "mask-grabcut-subject"
+  | "mask-grabcut-lineart";
 type GrabCutRequest = {
   id: number;
   methodId: GrabCutMethodId;
@@ -17,9 +23,19 @@ type GrabCutRequest = {
 };
 type GrabCutResponse =
   | { id: number; type: "status"; status: GrabCutProcessingStatus }
-  | { id: number; type: "result"; mask: ArrayBuffer; subjectInfo?: GrabCutSubjectInfo }
+  | {
+      id: number;
+      type: "result";
+      mask: ArrayBuffer;
+      subjectInfo?: GrabCutSubjectInfo;
+      lineArtInfo?: GrabCutLineArtInfo;
+    }
   | { id: number; type: "error"; error: string };
-type GrabCutResult = { mask: Uint8Array; subjectInfo?: GrabCutSubjectInfo };
+type GrabCutResult = {
+  mask: Uint8Array;
+  subjectInfo?: GrabCutSubjectInfo;
+  lineArtInfo?: GrabCutLineArtInfo;
+};
 type PendingRequest = {
   resolve: (result: GrabCutResult) => void;
   reject: (error: Error) => void;
@@ -52,7 +68,11 @@ function getWorker(): Worker {
       } else {
         pendingRequests.delete(response.id);
         if (response.type === "result") {
-          pending.resolve({ mask: new Uint8Array(response.mask), subjectInfo: response.subjectInfo });
+          pending.resolve({
+            mask: new Uint8Array(response.mask),
+            subjectInfo: response.subjectInfo,
+            lineArtInfo: response.lineArtInfo,
+          });
         }
         else pending.reject(new Error(response.error));
       }

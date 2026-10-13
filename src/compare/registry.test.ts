@@ -12,6 +12,7 @@ describe("比較手法レジストリ", () => {
       "mask-grabcut",
       "mask-grabcut-fast",
       "mask-grabcut-subject",
+      "mask-grabcut-lineart",
       "recolor-solid",
       "recolor-lab-luma",
       "recolor-hsv-hue",
@@ -36,6 +37,15 @@ describe("比較手法レジストリ", () => {
     expect(subjectParams).toContain("5%未満または95%超");
     expect(subjectParams).toContain("膨張外=確定背景");
     expect(subjectParams).toContain("GC_INIT_WITH_MASKを4回反復");
+    const lineArtParams = METHODS.find(({ id }) => id === "mask-grabcut-lineart")?.params.join(" ");
+    expect(lineArtParams).toContain("段1前景を8px膨張");
+    expect(lineArtParams).toContain("4連結で分割。小領域の結合なし");
+    expect(lineArtParams).toContain("投票範囲の2%を超える領域は投票せずGrabCut結果を維持");
+    expect(lineArtParams).toContain("投票範囲外: 段2のGrabCut結果を維持");
+    expect(lineArtParams).toContain("fgRatio 50%以上");
+    expect(lineArtParams).toContain("15%以下");
+    expect(lineArtParams).toContain("同数ならGrabCutを維持");
+    expect(lineArtParams).toContain("処理中は固定");
     expect(METHODS.find(({ id }) => id === "recolor-luma-colorize")?.params.join(" ")).toContain(
       "Lout=clamp(Lin−μ+Lt, 0, 100)",
     );
