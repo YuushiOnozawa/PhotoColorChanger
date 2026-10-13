@@ -1,0 +1,107 @@
+import type { ComparisonMethod } from "./types";
+
+export const METHODS: readonly ComparisonMethod[] = [
+  {
+    id: "color-rgb",
+    axis: "color",
+    axisTitle: "色判定",
+    title: "RGB距離（現行）",
+    description: "クリック位置の基準色とのRGBユークリッド距離で全画素を判定し、単色に置き換えます。",
+    params: ["色判定: RGBユークリッド距離", "境界制約: なし", "再着色: 単色置換"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "color-hsv",
+    axis: "color",
+    axisTitle: "色判定",
+    title: "HSV距離",
+    description: "色相の円環距離と彩度・明度の正規化距離で全画素を判定します。",
+    params: ["色判定: 円環H＋正規化S/Vのユークリッド距離", "境界制約: なし", "再着色: 単色置換"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "color-lab",
+    axis: "color",
+    axisTitle: "色判定",
+    title: "Lab ΔE",
+    description: "CIELAB距離の明度差に0.35の重みをかけて全画素を判定します。",
+    params: [
+      "色判定: √((0.35ΔL*)²＋Δa*²＋Δb*²)",
+      "許容差スケール: CIELABのL*・a*・b*座標単位",
+      "境界制約: なし",
+      "再着色: 単色置換",
+    ],
+    defaultTolerance: 10,
+    toleranceMax: 100,
+    toleranceUnit: "ΔE",
+  },
+  {
+    id: "boundary-none",
+    axis: "boundary",
+    axisTitle: "境界制約",
+    title: "境界制約なし",
+    description: "HSVマスクに含まれる画素を画像全体から選びます。",
+    params: ["色判定: HSV距離", "境界制約: なし", "再着色: 単色置換"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "boundary-xdog-sobel",
+    axis: "boundary",
+    axisTitle: "境界制約",
+    title: "XDoG→Sobel＋連結領域",
+    description: "HSVマスクをクリック位置からの連結領域に絞り、XDoG→Sobel線を境界に使います。",
+    params: ["色判定: HSV距離", "境界制約: XDoG閾値20・Sobel閾値20", "再着色: 単色置換"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "recolor-solid",
+    axis: "recolor",
+    axisTitle: "再着色",
+    title: "単色置換",
+    description: "共通マスク内を置換色で塗りつぶします。",
+    params: ["合成画像の固定マスク: 正解マスク", "アップロード画像の固定マスク: HSV距離"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "recolor-lab-luma",
+    axis: "recolor",
+    axisTitle: "再着色",
+    title: "Lab L*保持＋a*b*置換",
+    description: "共通マスク内のL*を保ち、置換色のa*・b*を使います。",
+    params: ["合成画像の固定マスク: 正解マスク", "アップロード画像の固定マスク: HSV距離"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+  {
+    id: "recolor-hsv-hue",
+    axis: "recolor",
+    axisTitle: "再着色",
+    title: "HSV色相シフト",
+    description: "共通マスク内の各画素を置換色の色相差だけ移動し、S/Vを保ちます。",
+    params: ["合成画像の固定マスク: 正解マスク", "アップロード画像の固定マスク: HSV距離"],
+    defaultTolerance: 12,
+    toleranceMax: 100,
+    toleranceUnit: "%",
+  },
+];
+
+export function getMethod(id: string) {
+  return METHODS.find((method) => method.id === id);
+}
+
+export const METHOD_GROUPS = [
+  { axis: "color", title: "色判定" },
+  { axis: "boundary", title: "境界制約" },
+  { axis: "recolor", title: "再着色" },
+] as const;
