@@ -10,6 +10,7 @@ describe("比較手法レジストリ", () => {
       "boundary-none",
       "boundary-xdog-sobel",
       "mask-grabcut",
+      "mask-grabcut-fast",
       "recolor-solid",
       "recolor-lab-luma",
       "recolor-hsv-hue",
@@ -24,6 +25,12 @@ describe("比較手法レジストリ", () => {
     expect(METHODS.find(({ id }) => id === "mask-grabcut")?.params.join(" ")).toContain(
       "画像端=確定背景",
     );
+    const fastParams = METHODS.find(({ id }) => id === "mask-grabcut-fast")?.params.join(" ");
+    expect(fastParams).toContain("margin max(32px,画像長辺の15%)");
+    expect(fastParams).toContain("ROI長辺512px以下");
+    expect(fastParams).toContain("反復回数4");
+    expect(fastParams).toContain("初期マスク縮小=最近傍");
+    expect(fastParams).toContain("mask-grabcutは全解像度版");
     expect(METHODS.find(({ id }) => id === "recolor-luma-colorize")?.params.join(" ")).toContain(
       "Lout=clamp(Lin−μ+Lt, 0, 100)",
     );

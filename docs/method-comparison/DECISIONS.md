@@ -23,3 +23,8 @@ Codexとの合議（AGMSG）やユーザー判断の結論を記録します。�
 - GrabCutはHSV候補を使ったGC_INIT_WITH_MASK初期化で4回反復する。クリック半径4pxを確定前景、seedに4近傍連結するHSV候補を推定前景、その他を推定背景、画像端を確定背景とする。OpenCV.jsはGrabCut手法の処理時だけ動的に読み込み、同期処理と非同期処理の結果描画は古い入力の結果を破棄する。
 - 陰影保持カラー化は共通固定マスクを用い、mask内平均をμ、置換色のLabを(Lt,at,bt)として、各画素を(clamp(Lin−μ+Lt, 0, 100), at, bt)に変換してsRGBへ戻す。
 - 反復3では両手法の実装、ユニットテスト、型検査・lint・全テスト・buildをローカルで確認する。Pages上のPlaywright確認はユーザーが実施する。
+
+## 2026-10-13 CP3
+
+- 2026-10-13 CP3: ユーザー目視でmask-grabcutが最良。課題は処理の重さ（1024px 1.7s/回、512px 0.49s、256px 0.12s、OpenCV転送0.3s）
+- 反復4（合議R1/R2）: 高速版=ROI＋512px、Worker singleton、OpenCVはfetch＋間接evalで読み込み（パッケージのimportは本番ビルドで壊れるため）

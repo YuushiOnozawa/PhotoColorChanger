@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { hexToRgb } from "../app/color";
 import { fitImageDimensions, ImageLoadError, loadImageFile } from "../app/imageLoader";
 import { processComparisonMethod } from "./algorithms";
 import { EXAMPLE_IMAGES } from "./exampleImages";
 import { METHODS } from "./registry";
 import { createSyntheticImage } from "./syntheticImage";
+import type { GrabCutProcessingStatus } from "./grabcutWorkerClient";
 import type { ComparisonMethod, ImageLike, ImagePoint, RgbColor } from "./types";
 
 const DEFAULT_REPLACEMENT = "#2f6fdb";
@@ -67,6 +68,34 @@ function loadImageUrl(url: string): Promise<HTMLImageElement> {
   });
 }
 
+function ProcessingOutput({
+  busy,
+  label,
+  children,
+}: {
+  busy: boolean;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative w-fit max-w-full" data-processing={busy ? "true" : undefined}>
+      {children}
+      {busy && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-white/75 text-sm font-semibold text-[#6e675e]"
+          role="status"
+        >
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isGrabCutMethod(methodId: string): boolean {
+  return methodId === "mask-grabcut" || methodId === "mask-grabcut-fast";
+}
+
 function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const inputCanvasRef = useRef<HTMLCanvasElement>(null);
   const outputCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -79,6 +108,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<GrabCutProcessingStatus | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const processingStartedAt = useRef(0);
   const [exampleSamples, setExampleSamples] = useState<ExampleSample[]>([]);
   const exampleInputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
   const exampleOutputCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
@@ -89,17 +121,34 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   }, [method.defaultTolerance, method.id]);
 
   useEffect(() => {
+    if (!isProcessing) return;
+    const timer = window.setInterval(
+      () => setElapsedSeconds((performance.now() - processingStartedAt.current) / 1000),
+      100,
+    );
+    return () => window.clearInterval(timer);
+  }, [isProcessing]);
+
+  useEffect(() => {
     let stale = false;
     const processImages = async () => {
       setIsProcessing(false);
       if (!image && exampleSamples.length === 0) return;
 
       setError(null);
-      setIsProcessing(method.id === "mask-grabcut");
+      const usesGrabCut = isGrabCutMethod(method.id);
+      setIsProcessing(usesGrabCut);
+      setProcessingStatus(null);
+      if (usesGrabCut) {
+        processingStartedAt.current = performance.now();
+        setElapsedSeconds(0);
+      }
       const replacement = colorFromHex(replacementColor);
       if (image && inputCanvasRef.current && outputCanvasRef.current) {
         drawImage(inputCanvasRef.current, image);
         const output = outputCanvasRef.current;
+        output.width = image.width;
+        output.height = image.height;
         output.getContext("2d")?.clearRect(0, 0, output.width, output.height);
         const result = await processComparisonMethod({
           image,
@@ -108,6 +157,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           replacement,
           tolerance,
           fixedMask: groundTruthMask,
+          onWorkerStatus: (status) => {
+            if (!stale) setProcessingStatus(status);
+          },
         });
         if (stale) return;
         drawImage(output, result);
@@ -120,7 +172,7 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
         if (!inputCanvas || !outputCanvas) continue;
 
         drawImage(inputCanvas, sample.image, EXAMPLE_CANVAS_MAX_EDGE);
-        outputCanvas.getContext("2d")?.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        drawImage(outputCanvas, sample.image, EXAMPLE_CANVAS_MAX_EDGE);
         const result = await processComparisonMethod({
           image: sample.image,
           methodId: method.id,
@@ -128,6 +180,9 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
           replacement,
           tolerance,
           fixedMask: null,
+          onWorkerStatus: (status) => {
+            if (!stale) setProcessingStatus(status);
+          },
         });
         if (stale) return;
         drawImage(outputCanvas, result, EXAMPLE_CANVAS_MAX_EDGE);
@@ -138,13 +193,16 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
       .catch(() => {
         if (stale) return;
         setError(
-          method.id === "mask-grabcut"
+          isGrabCutMethod(method.id)
             ? "OpenCVの読み込みまたはGrabCut処理に失敗しました。"
             : "画像を処理できませんでした。",
         );
       })
       .finally(() => {
-        if (!stale) setIsProcessing(false);
+        if (!stale) {
+          setIsProcessing(false);
+          setProcessingStatus(null);
+        }
       });
 
     return () => {
@@ -240,6 +298,8 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
   };
 
   const displayedTolerance = Number.isInteger(tolerance) ? tolerance : tolerance.toFixed(1);
+  const processingLabel =
+    processingStatus === "initializing" ? "OpenCV準備中…" : "処理中… " + elapsedSeconds.toFixed(1) + "秒";
   const showUploadedMaskNotice =
     method.axis === "recolor" && image !== null && groundTruthMask === null;
   const showExampleMaskNotice = method.axis === "recolor" && exampleSamples.length > 0;
@@ -378,11 +438,7 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
             {error}
           </p>
         )}
-        {isProcessing && method.id === "mask-grabcut" && (
-          <p className="mt-4 text-sm text-[#6e675e]" role="status">
-            OpenCV読み込み中…
-          </p>
-        )}
+
         {imageName && <p className="mt-3 text-sm text-[#6e675e]">読み込み中の画像: {imageName}</p>}
         <p className="mt-2 text-xs text-[#81796f]">画像処理はブラウザ内で行います。</p>
       </section>
@@ -400,12 +456,14 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
         </div>
         <div className="min-w-0 rounded-2xl border border-[#ded6c9] bg-white p-4">
           <h2 className="mb-3 font-bold">出力</h2>
-          <canvas
-            aria-label="処理結果"
-            className="block h-auto max-h-[520px] max-w-full border border-[#e8e1d7] object-contain"
-            data-testid="compare-output"
-            ref={outputCanvasRef}
-          />
+          <ProcessingOutput busy={isProcessing} label={processingLabel}>
+            <canvas
+              aria-label="処理結果"
+              className="block h-auto max-h-[520px] max-w-full border border-[#e8e1d7] object-contain"
+              data-testid="compare-output"
+              ref={outputCanvasRef}
+            />
+          </ProcessingOutput>
         </div>
       </section>
 
@@ -439,14 +497,16 @@ function ComparisonMethodPage({ method }: { method: ComparisonMethod }) {
                 </div>
                 <div className="min-w-0">
                   <p className="mb-2 text-sm font-semibold">出力</p>
-                  <canvas
-                    aria-label={`${sample.name} 処理結果`}
-                    className="block h-auto max-h-[520px] max-w-full border border-[#e8e1d7] object-contain"
-                    data-testid={`compare-example-${sample.name}-output`}
-                    ref={(canvas) => {
-                      exampleOutputCanvasRefs.current[sample.name] = canvas;
-                    }}
-                  />
+                  <ProcessingOutput busy={isProcessing} label={processingLabel}>
+                    <canvas
+                      aria-label={sample.name + " 処理結果"}
+                      className="block h-auto max-h-[520px] max-w-full border border-[#e8e1d7] object-contain"
+                      data-testid={"compare-example-" + sample.name + "-output"}
+                      ref={(canvas) => {
+                        exampleOutputCanvasRefs.current[sample.name] = canvas;
+                      }}
+                    />
+                  </ProcessingOutput>
                 </div>
               </div>
             </div>
