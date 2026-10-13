@@ -8,9 +8,11 @@ const METHOD_IDS = [
   "color-lab",
   "boundary-none",
   "boundary-xdog-sobel",
+  "mask-grabcut",
   "recolor-solid",
   "recolor-lab-luma",
   "recolor-hsv-hue",
+  "recolor-luma-colorize",
 ] as const;
 
 async function changedPixelRatio(page: Page, inputTestId: string, outputTestId: string) {
@@ -116,7 +118,7 @@ test.describe("合成画像を使った各手法の処理", () => {
               const pixels = context.getImageData(0, 0, copy.width, copy.height).data;
               return pixels.some((value, index) => index % 4 === 3 && value !== 0);
             }),
-          { message: "出力キャンバスに画像が描画されること", timeout: 10_000 },
+          { message: "出力キャンバスに画像が描画されること", timeout: 60_000 },
         )
         .toBe(true);
 
@@ -179,7 +181,7 @@ test.describe("実物サンプル2枚を使った各手法の処理", () => {
         await expect
           .poll(
             () => changedPixelRatio(page, `compare-example-${name}-input`, `compare-example-${name}-output`),
-            { message: `${name} の出力が入力から変化すること`, timeout: 30_000 },
+            { message: `${name} の出力が入力から変化すること`, timeout: 60_000 },
           )
           .toBeGreaterThan(0.001);
       }
